@@ -83,7 +83,7 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_executable(wsclean wscleanmain.cpp wsclean.cpp beamevaluator.cpp fftresampler.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp model.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp tilebeam.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedpolclean.cpp cleanalgorithms/simpleclean.cpp msprovider/contiguousms.cpp msprovider/msprovider.cpp msprovider/partitionedms.cpp)
+add_executable(wsclean wscleanmain.cpp wsclean.cpp beamevaluator.cpp fftresampler.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp model.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp tilebeam.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/simpleclean.cpp msprovider/contiguousms.cpp msprovider/msprovider.cpp msprovider/partitionedms.cpp)
 
 set_target_properties(wsclean PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
