@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
 {
 	std::cout << "\n"
 		" ** This software package is released under the GPL version 3. **\n"
-	  " ** Author: Andre Offringa (offringa@gmail.com).               **\n";
+	  " ** Author: Andre Offringa (offringa@gmail.com).               **\n\n";
 	
 	if(argc < 2)
 	{
@@ -82,6 +82,7 @@ int main(int argc, char *argv[])
 			"\t   Force or disable reordering of Measurement Set. This can be faster when the measurement set needs to\n"
 			"\t   be iterated several times, such as with many major iterations or in channel imaging mode.\n"
 			"\t   Default: only reorder when in channel imaging mode.\n"
+			"\t-join-channels\n"
 			"\t-addmodel <modelfile>\n"
 			"\t-addmodelapp <modelfile>\n"
 			"\t-savemodel <modelfile>\n"
@@ -286,6 +287,11 @@ int main(int argc, char *argv[])
 		{
 			++argi;
 			wsclean.SetMemFraction(atof(argv[argi]) / 100.0);
+		}
+		else if(param == "absmem")
+		{
+			++argi;
+			wsclean.SetMemAbsLimit(atof(argv[argi]));
 		}
 		else if(param == "wlimit")
 		{

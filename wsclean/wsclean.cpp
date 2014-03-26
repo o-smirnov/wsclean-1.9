@@ -11,7 +11,7 @@
 #include "wsinversion.h"
 
 #include "cleanalgorithms/cleanalgorithm.h"
-#include "cleanalgorithms/joinedpolclean.h"
+#include "cleanalgorithms/joinedclean.h"
 #include "cleanalgorithms/simpleclean.h"
 
 #include "msprovider/contiguousms.h"
@@ -26,7 +26,7 @@ std::string commandLine;
 WSClean::WSClean() :
 	_imgWidth(2048), _imgHeight(2048), _channelsOut(1),
 	_pixelScaleX(0.01 * M_PI / 180.0), _pixelScaleY(0.01 * M_PI / 180.0),
-	_threshold(0.0), _gain(0.1), _mGain(1.0), _manualBeamSize(0.0), _memFraction(1.0), _wLimit(0.0),
+	_threshold(0.0), _gain(0.1), _mGain(1.0), _manualBeamSize(0.0), _memFraction(1.0), _absMemLimit(0.0), _wLimit(0.0),
 	_nWLayers(0), _nIter(0), _antialiasingKernelSize(7), _overSamplingFactor(63),
 	_globalSelection(),
 	_columnName(), _addModelFilename(), _saveModelFilename(), _cleanAreasFilename(),
@@ -34,7 +34,7 @@ WSClean::WSClean() :
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
 	_allowNegative(true), _smallPSF(false), _smallInversion(false), _stopOnNegative(false), _makePSF(false),
-	_forceReorder(false), _forceNoReorder(false), _joinedPolarizationCleaning(false),
+	_forceReorder(false), _forceNoReorder(false), _joinedPolarizationCleaning(false), _joinedFrequencyCleaning(false),
 	_gridMode(LayeredImager::KaiserBessel),
 	_filenames(),
 	_commandLine(),
@@ -259,7 +259,7 @@ void WSClean::initializeImageWeights(const MSSelection& partSelection)
 void WSClean::initializeCleanAlgorithm()
 {
 	if(_joinedPolarizationCleaning)
-		_cleanAlgorithm.reset(new JoinedPolClean());
+		_cleanAlgorithm.reset(new JoinedClean<>());
 	else
 		_cleanAlgorithm.reset(new SimpleClean());
 	_cleanAlgorithm->SetMaxNIter(_nIter);
@@ -331,50 +331,64 @@ void WSClean::Run()
 	
 	_firstMSBand = BandData(casa::MeasurementSet(_filenames[0]).spectralWindow());
 	
-	for(size_t outChannelIndex=0; outChannelIndex!=_channelsOut; ++outChannelIndex)
+	if(_joinedFrequencyCleaning)
 	{
-		runChannel(outChannelIndex);
+		// run all frequencies
+		runChannel(0);
 	}
+	else {
+		for(size_t outChannelIndex=0; outChannelIndex!=_channelsOut; ++outChannelIndex)
+		{
+			runChannel(outChannelIndex);
+		}
+	}
+}
+
+void WSClean::selectChannels(MSSelection& selection, size_t outChannelIndex, size_t channelsOut)
+{
+	size_t startCh, endCh;
+	if(selection.HasChannelRange())
+	{
+		startCh = selection.ChannelRangeStart();
+		endCh = selection.ChannelRangeEnd();
+	}
+	else {
+		startCh = 0;
+		endCh = _firstMSBand.ChannelCount();
+	}
+	size_t newStart = startCh + (endCh - startCh) * outChannelIndex / channelsOut;
+	size_t newEnd = startCh + (endCh - startCh) * (outChannelIndex+1) / channelsOut;
+	selection.SetChannelRange(newStart, newEnd);
 }
 
 void WSClean::runChannel(size_t outChannelIndex)
 {
-	MSSelection partSelection = _globalSelection;
-	_inversionAlgorithm.reset(new WSInversion(&_imageAllocator, _memFraction));
+	_inversionAlgorithm.reset(new WSInversion(&_imageAllocator, _memFraction, _absMemLimit));
 	static_cast<WSInversion&>(*_inversionAlgorithm).SetGridMode(_gridMode);
 	
-	if(_doReorder)
-	{
-		size_t startCh, endCh;
-		if(_globalSelection.HasChannelRange())
-		{
-			startCh = _globalSelection.ChannelRangeStart();
-			endCh = _globalSelection.ChannelRangeEnd();
-		}
-		else {
-			startCh = 0;
-			endCh = _firstMSBand.ChannelCount();
-		}
-		size_t newStart = startCh + (endCh - startCh) * outChannelIndex / _channelsOut;
-		size_t newEnd = startCh + (endCh - startCh) * (outChannelIndex+1) / _channelsOut;
-		partSelection.SetChannelRange(newStart, newEnd);
-	}
-		
+	size_t  joinedChannelsOut;
+	if(_joinedFrequencyCleaning)
+		joinedChannelsOut = _channelsOut;
+	else
+		joinedChannelsOut = 1;
+	
+	_currentPartSelection = _globalSelection;
+	if(!_joinedFrequencyCleaning)
+		selectChannels(_currentPartSelection, outChannelIndex, _channelsOut);
+	
 	const std::string rootPrefix = _prefixName;
-	if(_channelsOut != 1)
-	{
-		std::ostringstream partPrefixNameStr;
-		partPrefixNameStr << rootPrefix << '-';
-		if(outChannelIndex < 1000) partPrefixNameStr << '0';
-		if(outChannelIndex < 100) partPrefixNameStr << '0';
-		if(outChannelIndex < 10) partPrefixNameStr << '0';
-		partPrefixNameStr << outChannelIndex;
-		_prefixName = partPrefixNameStr.str();
-	}
+	_prefixName = frequencyPrefix(rootPrefix, outChannelIndex, _channelsOut);
 		
-	for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
+	for(size_t ch=0; ch!=joinedChannelsOut; ++ch)
 	{
-		runPolarizationStart(outChannelIndex, *curPol);
+		const MSSelection selectionBefore = _currentPartSelection;
+		if(_joinedFrequencyCleaning)
+			selectChannels(_currentPartSelection, outChannelIndex, _channelsOut);
+		for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
+		{
+			runPolarizationStart(outChannelIndex, *curPol);
+		}
+		_currentPartSelection = selectionBefore;
 	}
 	
 	initializeCleanAlgorithm();
@@ -393,31 +407,38 @@ void WSClean::runChannel(size_t outChannelIndex)
 			
 			if(_mGain != 1.0)
 			{
-				for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
+				for(size_t ch=0; ch!=joinedChannelsOut; ++ch)
 				{
-					prepareInversionAlgorithm(*curPol);
-					
-					// TODO handle imaginary
-					initializeCurMSProviders(outChannelIndex, *curPol);
-					predict(*curPol);
-					
-					imageMainNonFirst(*curPol);
-					clearCurMSProviders();
-				
-					if(!reachedMajorThreshold)
+					const MSSelection selectionBefore = _currentPartSelection;
+					if(_joinedFrequencyCleaning)
+						selectChannels(_currentPartSelection, outChannelIndex, _channelsOut);
+					for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
 					{
-						// This was the final major iteration: save results
-						if(!(*curPol == Polarization::YX && _polarizations.count(Polarization::XY)!=0))
+						prepareInversionAlgorithm(*curPol);
+						
+						// TODO handle imaginary
+						initializeCurMSProviders(outChannelIndex, *curPol);
+						predict(*curPol);
+						
+						imageMainNonFirst(*curPol);
+						clearCurMSProviders();
+					
+						if(!reachedMajorThreshold)
 						{
-							double* residualImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
-							_residualImages.Load(residualImage, *curPol, false);
-							std::cout << "Writing residual image... " << std::flush;
-							_fitsWriter.Write(polPrefix(*curPol, false) + "-residual.fits", residualImage);
-							_imageAllocator.Free(residualImage);
-							std::cout << "DONE\n";
+							// This was the final major iteration: save results
+							if(!(*curPol == Polarization::YX && _polarizations.count(Polarization::XY)!=0))
+							{
+								double* residualImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
+								_residualImages.Load(residualImage, *curPol, false);
+								std::cout << "Writing residual image... " << std::flush;
+								_fitsWriter.Write(polPrefix(*curPol, false) + "-residual.fits", residualImage);
+								_imageAllocator.Free(residualImage);
+								std::cout << "DONE\n";
+							}
 						}
-					}
-				}
+					} // end of polarization loop
+					_currentPartSelection = selectionBefore;
+				} // end of joined channels loop
 				
 				++majorIterationNr;
 			}
@@ -604,7 +625,7 @@ void WSClean::performSimpleClean(bool& reachedMajorThreshold, size_t majorIterat
 
 void WSClean::performJoinedPolClean(bool& reachedMajorThreshold, size_t majorIterationNr)
 {
-	JoinedPolClean::ImageSet
+	JoinedClean<>::ImageSet
 		modelSet(_imgWidth*_imgHeight, _imageAllocator),
 		residualSet(_imgWidth*_imgHeight, _imageAllocator);
 		
@@ -614,7 +635,7 @@ void WSClean::performJoinedPolClean(bool& reachedMajorThreshold, size_t majorIte
 	residualSet.Load(_residualImages);
 
 	_cleaningWatch.Start();
-	static_cast<JoinedPolClean&>(*_cleanAlgorithm).ExecuteMajorIteration(residualSet, modelSet, psfImage, _imgWidth, _imgHeight, reachedMajorThreshold);
+	static_cast<JoinedClean<>&>(*_cleanAlgorithm).ExecuteMajorIteration(residualSet, modelSet, psfImage, _imgWidth, _imgHeight, reachedMajorThreshold);
 	_cleaningWatch.Pause();
 	
 	_imageAllocator.Free(psfImage);
@@ -634,18 +655,18 @@ void WSClean::performJoinedPolClean(bool& reachedMajorThreshold, size_t majorIte
 			if(_mGain == 1.0)
 			{
 				std::cout << "Writing residual image... " << std::flush;
-				_fitsWriter.Write(polPrefix(polarization, isImaginary) + "-residual.fits", residualSet.Get(i));
+				_fitsWriter.Write(polPrefix(polarization, isImaginary) + "-residual.fits", residualSet.GetImage(i));
 			}
 			else {
 				std::cout << "Writing first iteration image... " << std::flush;
-				_fitsWriter.Write(polPrefix(polarization, isImaginary) + "-first-residual.fits", residualSet.Get(i));
+				_fitsWriter.Write(polPrefix(polarization, isImaginary) + "-first-residual.fits", residualSet.GetImage(i));
 			}
 			std::cout << "DONE\n";
 		}
 		if(!reachedMajorThreshold)
 		{
 			std::cout << "Writing model image... " << std::flush;
-			_fitsWriter.Write(polPrefix(polarization, isImaginary) + "-model.fits", modelSet.Get(i));
+			_fitsWriter.Write(polPrefix(polarization, isImaginary) + "-model.fits", modelSet.GetImage(i));
 			std::cout << "DONE\n";
 		}
 	}
