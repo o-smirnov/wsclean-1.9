@@ -15,6 +15,9 @@ find_library(FITSIO_LIB cfitsio REQUIRED)
 find_library(DL_LIB dl REQUIRED)
 find_path(FITSIO_INCLUDE_DIR NAMES fitsio.h)
 find_path(FFTW3_INCLUDE_DIR NAMES fftw3.h)
+find_library(GSL_LIB NAMES gsl)
+find_path(GSL_INCLUDE_DIR NAMES gsl/gsl_version.h)
+find_library(CBLAS_LIB NAMES gslcblas)
 
 set(CASA_LIBS ${CASA_MS_LIB} ${CASA_TABLES_LIB} ${CASA_MEASURES_LIB} ${CASA_CASA_LIB} ${CASA_FITS_LIB} ${DL_LIB})
 
@@ -24,6 +27,7 @@ include_directories(${CASA_INCLUDE_DIR})
 include_directories(${Boost_INCLUDE_DIR})
 include_directories(${FITSIO_INCLUDE_DIR})
 include_directories(${FFTW3_INCLUDE_DIR})
+include_directories(${GSL_INCLUDE_DIR})
 
 # The following stuff will set the "rpath" correctly, so that
 # LD_LIBRARY_PATH doesn't have to be set.
@@ -83,10 +87,12 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_executable(wsclean wscleanmain.cpp wsclean.cpp beamevaluator.cpp fftresampler.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp model.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp tilebeam.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/simpleclean.cpp msprovider/contiguousms.cpp msprovider/msprovider.cpp msprovider/partitionedms.cpp)
+set(BEAMFILES beam/tilebeam.cpp beam/tilebeambase.cpp beam/tilebeam2014.cpp beam/tileimpedance.cpp beam/lnaimpedance.cpp)
+
+add_executable(wsclean wscleanmain.cpp wsclean.cpp beamevaluator.cpp fftresampler.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp model.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/simpleclean.cpp msprovider/contiguousms.cpp msprovider/msprovider.cpp msprovider/partitionedms.cpp ${BEAMFILES})
 
 set_target_properties(wsclean PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
-target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB})
+target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB})
 
 install(TARGETS wsclean DESTINATION bin)

@@ -4,7 +4,26 @@
 #include <complex>
 #include <stdexcept>
 #include <set>
-
+#include <vector>
+/**
+ * Class for various simple polarization related values.
+ * 
+ * The visibility relations for converting polarizations are:
+ * 
+ *   RR = I + V  ;   I = (RR + LL)/2
+ *   RL = Q + iU ;   Q = (RL + LR)/2
+ *   LR = Q - iU ;   U = -i (RL - LR)/2
+ *   LL = I - V  ;   V = (RR - LL)/2
+ *
+ *   XX = I - Q  ;   I = (YY + XX)/2
+ *   XY = U - iV ;   Q = (YY - XX)/2
+ *   YX = U + iV ;   U = (YX + XY)/2
+ *   YY = I + Q  ;   V = -i(YX - XY)/2
+ * 
+ * These definitions assumes that 'X' and 'Y' are labelled as they are in
+ * CASA measurement sets and uvfits files, which is NOT the same as what
+ * the IEEE definitions tell (X and Y are swapped).
+ */
 class Polarization
 {
 public:
@@ -51,6 +70,54 @@ public:
 			}
 			default: throw std::runtime_error("TypeTo4PolIndex(): can't convert given polarization to index");
 		}
+	}
+	
+	static enum PolarizationEnum AipsIndexToEnum(int index)
+	{
+		switch(index)
+		{
+			case 1: return StokesI;
+			case 2: return StokesQ;
+			case 3: return StokesU;
+			case 4: return StokesV;
+			case 5: return RR;
+			case 6: return RL;
+			case 7: return LR;
+			case 8: return LL;
+			case 9: return XX;
+			case 10: return XY;
+			case 11: return YX;
+			case 12: return YY;
+			default: throw std::runtime_error("AipsIndexToEnum(): unknown aips polarization index");
+		}
+	}
+	
+	static bool TypeToIndex(enum PolarizationEnum polarization, const std::vector<PolarizationEnum>& polList, size_t& index)
+	{
+		for(size_t i=0; i!=polList.size(); ++i)
+		{
+			if(polList[i] == polarization)
+			{
+				index = i;
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	template<typename Range>
+	static bool TypeToIndex(enum PolarizationEnum polarization, const Range& polList, size_t& index)
+	{
+		size_t curIndex = 0;
+		for(typename Range::const_iterator i=polList.begin(); i!=polList.end(); ++i, ++curIndex)
+		{
+			if(*i == polarization)
+			{
+				index = curIndex;
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	static size_t StokesToIndex(enum PolarizationEnum polarization)
@@ -110,7 +177,7 @@ public:
 		}
 	}
 	
-	static bool Has4Polarizations(const std::set<PolarizationEnum>& polarizations)
+	static bool HasFullPolarization(const std::set<PolarizationEnum>& polarizations)
 	{
 		return
 			(polarizations.count(XX)>0 && polarizations.count(XY)>0 &&
@@ -123,9 +190,40 @@ public:
 			 polarizations.count(LR)>0 && polarizations.count(LL)>0);
 	}
 	
+	static bool HasFullLinearPolarization(const std::set<PolarizationEnum>& polarizations)
+	{
+		return
+			(polarizations.count(XX)>0 && polarizations.count(XY)>0 &&
+			 polarizations.count(YX)>0 && polarizations.count(YY)>0);
+	}
+	
+	static bool HasFullStokesPolarization(const std::set<PolarizationEnum>& polarizations)
+	{
+		return
+			(polarizations.count(StokesI)>0 && polarizations.count(StokesQ)>0 &&
+			 polarizations.count(StokesU)>0 && polarizations.count(StokesV)>0);
+	}
+	
 	static bool IsComplex(PolarizationEnum polarization)
 	{
 		return polarization==XY || polarization==YX;
+	}
+	
+	static PolarizationEnum ParseString(const std::string& str)
+	{
+		if(str == "XX") return XX;
+		else if(str == "XY") return XY;
+		else if(str == "YX") return YX;
+		else if(str == "YY") return YY;
+		else if(str == "I") return StokesI;
+		else if(str == "Q") return StokesQ;
+		else if(str == "U") return StokesU;
+		else if(str == "V") return StokesV;
+		else if(str == "RR") return RR;
+		else if(str == "RL") return RL;
+		else if(str == "LR") return LR;
+		else if(str == "LL") return LL;
+		else throw std::runtime_error(std::string("Could not parse polarization string: ") + str);
 	}
 	
 	static std::set<PolarizationEnum> ParseList(const std::string& listStr)
@@ -214,16 +312,16 @@ public:
 		stokes[0] = 0.5 * (linear[3].real() + linear[0].real());
 		stokes[1] = 0.5 * (linear[3].real() - linear[0].real());
 		stokes[2] = 0.5 * (linear[2].real() + linear[1].real());
-		stokes[3] = 0.5 * (-linear[2].imag() + linear[1].imag());
+		stokes[3] = 0.5 * (linear[2].imag() - linear[1].imag());
 	}
 	
 	template<typename NumType>
 	static void StokesToLinear(const NumType* stokes, std::complex<NumType> *linear)
 	{
-		linear[3] = stokes[0] + stokes[1];
-		linear[2] = std::complex<NumType>(stokes[2], -stokes[3]);
-		linear[1] = std::complex<NumType>(stokes[2], stokes[3]);
 		linear[0] = stokes[0] - stokes[1];
+		linear[1] = std::complex<NumType>(stokes[2], -stokes[3]);
+		linear[2] = std::complex<NumType>(stokes[2], stokes[3]);
+		linear[3] = stokes[0] + stokes[1];
 	}
 };
 

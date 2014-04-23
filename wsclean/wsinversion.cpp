@@ -37,12 +37,16 @@ WSInversion::WSInversion(ImageBufferAllocator<double>* imageAllocator, double me
 	}
 	else {
 		double limitInGB = memSizeInGB*memFraction;
-		if(limitInGB > absMemLimit)
+		if(absMemLimit!=0.0 && limitInGB > absMemLimit)
 			limitInGB = absMemLimit;
-		std::cout << "Detected " << round(memSizeInGB*10.0)/10.0 << " GB of system memory, usage limited to " << round(limitInGB*10.0)/10.0 << " GB (frac=" << round(memFraction*1000.0)/10.0 << "%, limit=" << round(limitInGB) << "GB)\n";
+		std::cout << "Detected " << round(memSizeInGB*10.0)/10.0 << " GB of system memory, usage limited to " << round(limitInGB*10.0)/10.0 << " GB (frac=" << round(memFraction*1000.0)/10.0 << "%, ";
+		if(absMemLimit == 0.0)
+			std::cout << "no limit)\n";
+		else
+			std::cout << "limit=" << round(absMemLimit*10.0)/10.0 << "GB)\n";
 		
 		_memSize = int64_t((double) pageCount * (double) pageSize * memFraction);
-		if(double(_memSize) > double(1024.0*1024.0*1024.0) * absMemLimit)
+		if(absMemLimit!=0.0 && double(_memSize) > double(1024.0*1024.0*1024.0) * absMemLimit)
 			_memSize = int64_t(double(absMemLimit) * double(1024.0*1024.0*1024.0));
 	}
 }
@@ -179,8 +183,8 @@ void WSInversion::initializeMeasurementSet(MSProvider& msProvider, WSInversion::
 		if(minResY%4 != 0) minResY += 4 - (minResY%4);
 		if(minResX < _actualInversionWidth || minResY < _actualInversionHeight)
 		{
-			_actualInversionWidth = std::min(minResX, _actualInversionWidth);
-			_actualInversionHeight = std::min(minResY, _actualInversionHeight);
+			_actualInversionWidth = std::max(std::min(minResX, _actualInversionWidth), size_t(32));
+			_actualInversionHeight = std::max(std::min(minResY, _actualInversionHeight), size_t(32));
 			std::cout << "Setting small inversion image size of " << _actualInversionWidth << " x " << _actualInversionHeight << "\n";
 			_actualPixelSizeX = totalWidth / _actualInversionWidth;
 			_actualPixelSizeY = totalHeight / _actualInversionHeight;

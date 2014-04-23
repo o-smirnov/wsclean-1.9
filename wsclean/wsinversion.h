@@ -42,12 +42,16 @@ class WSInversion : public InversionAlgorithm
 		virtual bool HasDenormalPhaseCentre() const { return _denormalPhaseCentre; }
 		virtual double PhaseCentreDL() const { return _phaseCentreDL; }
 		virtual double PhaseCentreDM() const { return _phaseCentreDM; }
+		virtual double ImageWeight() const { return _totalWeight; }
 		
 		enum LayeredImager::GridModeEnum GridMode() const { return _gridMode; }
 		void SetGridMode(LayeredImager::GridModeEnum gridMode) { _gridMode = gridMode; }
 		
 		virtual bool HasGriddingCorrectionImage() const { return _gridMode == LayeredImager::KaiserBessel; }
 		virtual void GetGriddingCorrectionImage(double *image) const { _imager->GetGriddingCorrectionImage(image); }
+		
+		size_t ActualInversionWidth() const { return _actualInversionWidth; }
+		size_t ActualInversionHeight() const { return _actualInversionHeight; }
 	private:
 		struct InversionWorkItem
 		{

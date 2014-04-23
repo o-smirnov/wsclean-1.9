@@ -50,7 +50,9 @@ public:
 		_globalSelection.SetFieldId(fieldId);
 	}
 	void SetChannelsOut(size_t channelsOut) { _channelsOut = channelsOut; }
+	void SetJoinPolarizations(bool joinPolarizations) { _joinedPolarizationCleaning = joinPolarizations; }
 	void SetJoinChannels(bool joinChannels) { _joinedFrequencyCleaning = joinChannels; }
+	void SetMFSWeighting(bool mfsWeighting) { _mfsWeighting = mfsWeighting; }
 	void SetWeightMode(enum WeightMode::WeightingEnum weighting) {
 		_weightMode.SetMode(WeightMode(weighting));
 	}
@@ -65,58 +67,80 @@ public:
 	void SetForceNoReorder(bool forceNoReorder) { _forceNoReorder = forceNoReorder; }
 	void SetMemFraction(double memFraction) { _memFraction = memFraction; }
 	void SetMemAbsLimit(double absMemLimit) { _absMemLimit = absMemLimit; }
+	void SetMinUVW(double minUVW) { _globalSelection.SetMinUVW(minUVW); }
+	void SetMaxUVW(double maxUVW) { _globalSelection.SetMaxUVW(maxUVW); }
 	void SetWLimit(double wLimit) { _wLimit = wLimit; }
 	void SetCommandLine(const std::string& cmdLine) { _commandLine = cmdLine; }
 	
 	void AddInputMS(const std::string& msPath) { _filenames.push_back(msPath); }
 	
 	void Run();
+	
+	bool JoinedFrequencyCleaning() const { return _joinedFrequencyCleaning; }
 private:
-	void runChannel(size_t outChannelIndex);
-	void runPolarizationStart(size_t outChannelIndex, PolarizationEnum polarization);
-	void performClean(bool& reachedMajorThreshold, size_t majorIterationNr);
-	void performSimpleClean(bool& reachedMajorThreshold, size_t majorIterationNr);
-	void performJoinedPolClean(bool& reachedMajorThreshold, size_t majorIterationNr);
+	void runIndependentChannel(size_t outChannelIndex);
+	void runFirstInversion(size_t outChannelIndex, PolarizationEnum polarization, size_t joinedChannelIndex);
+	void performClean(size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr);
+	void performSimpleClean(class CleanAlgorithm& cleanAlgorithm, size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr, PolarizationEnum polarization);
+	void performJoinedPolClean(size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr);
+	void performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majorIterationNr);
 	void prepareInversionAlgorithm(PolarizationEnum polarization);
 	
 	void initFitsWriter(class FitsWriter& writer);
 	void setCleanParameters(class FitsWriter& writer, const class CleanAlgorithm& clean);
 	void updateCleanParameters(class FitsWriter& writer, size_t minorIterationNr, size_t majorIterationNr);
 	void initializeImageWeights(const MSSelection& partSelection);
+	void initializeMFSImageWeights();
 	void initializeCleanAlgorithm();
-	void initializeCurMSProviders(size_t outChannelIndex, PolarizationEnum polarization);
+	void freeCleanAlgorithms();
+	void initializeCurMSProviders(size_t currentChannelIndex, PolarizationEnum polarization);
 	void clearCurMSProviders();
-	void storeAndCombineXYandYX(CachedImageSet& dest, PolarizationEnum polarization, bool isImaginary, const double* image);
+	void storeAndCombineXYandYX(CachedImageSet& dest, PolarizationEnum polarization, size_t joinedChannelIndex, bool isImaginary, const double* image);
 	void selectChannels(MSSelection& selection, size_t outChannelIndex, size_t channelsOut);
 	
-	void imagePSF();
+	void imagePSF(size_t joinedChannelIndex);
 	void imageGridding();
-	void imageMainFirst(PolarizationEnum polarization);
-	void imageMainNonFirst(PolarizationEnum polarization);
-	void predict(PolarizationEnum polarization);
+	void imageMainFirst(PolarizationEnum polarization, size_t joinedChannelIndex);
+	void imageMainNonFirst(PolarizationEnum polarization, size_t joinedChannelIndex);
+	void predict(PolarizationEnum polarization, size_t joinedChannelIndex);
 	
-	std::string polPrefix(PolarizationEnum polarization, bool isImaginary) const
+	void makeMFSImage(const string& suffix, PolarizationEnum pol, bool isImaginary);
+	void writeFits(const string& suffix, const double* image, PolarizationEnum pol, size_t channelIndex, bool isImaginary);
+	
+	std::string getPrefix(PolarizationEnum polarization, size_t channelIndex, bool isImaginary) const
 	{
-		if(_polarizations.size() == 1)
-			return _prefixName;
-		else if(isImaginary)
-			return _prefixName + "-" + Polarization::TypeToShortString(polarization) + "i";
-		else
-			return _prefixName + "-" + Polarization::TypeToShortString(polarization);
-	}
-	std::string frequencyPrefix(const std::string& rootPrefix, size_t channelIndex, size_t totalChannels) const 
-	{
-		if(totalChannels != 1)
+		std::ostringstream partPrefixNameStr;
+		partPrefixNameStr << _prefixName;
+		if(_channelsOut != 1)
 		{
-			std::ostringstream partPrefixNameStr;
-			partPrefixNameStr << rootPrefix << '-';
+			partPrefixNameStr << '-';
 			if(channelIndex < 1000) partPrefixNameStr << '0';
 			if(channelIndex < 100) partPrefixNameStr << '0';
 			if(channelIndex < 10) partPrefixNameStr << '0';
 			partPrefixNameStr << channelIndex;
-			return partPrefixNameStr.str();
 		}
-		else return rootPrefix;
+		if(_polarizations.size() != 1)
+		{
+			partPrefixNameStr << '-' << Polarization::TypeToShortString(polarization);
+			if(isImaginary)
+				partPrefixNameStr << 'i';
+		}
+		return partPrefixNameStr.str();
+	}
+	
+	std::string getMFSPrefix(PolarizationEnum polarization, bool isImaginary) const
+	{
+		std::ostringstream partPrefixNameStr;
+		partPrefixNameStr << _prefixName;
+		if(_channelsOut != 1)
+			partPrefixNameStr << "-MFS";
+		if(_polarizations.size() != 1)
+		{
+			partPrefixNameStr << '-' << Polarization::TypeToShortString(polarization);
+			if(isImaginary)
+				partPrefixNameStr << 'i';
+		}
+		return partPrefixNameStr.str();
 	}
 	
 	size_t _imgWidth, _imgHeight, _channelsOut;
@@ -128,18 +152,20 @@ private:
 	WeightMode _weightMode;
 	std::string _prefixName;
 	bool _allowNegative, _smallPSF, _smallInversion, _addApparentModel, _stopOnNegative, _makePSF;
-	bool _forceReorder, _forceNoReorder, _joinedPolarizationCleaning, _joinedFrequencyCleaning;
+	bool _forceReorder, _forceNoReorder, _joinedPolarizationCleaning, _joinedFrequencyCleaning, _mfsWeighting;
 	enum LayeredImager::GridModeEnum _gridMode;
 	std::vector<std::string> _filenames;
 	std::string _commandLine;
+	std::vector<size_t> _weightPerChannel;
 	
 	std::unique_ptr<class InversionAlgorithm> _inversionAlgorithm;
 	std::unique_ptr<class ImageWeights> _imageWeights;
-	std::unique_ptr<class CleanAlgorithm> _cleanAlgorithm;
+	std::vector<class CleanAlgorithm*> _cleanAlgorithms;
 	std::unique_ptr<class AreaSet> _cleanAreas;
 	ImageBufferAllocator<double> _imageAllocator;
 	Stopwatch _inversionWatch, _predictingWatch, _cleaningWatch;
 	bool _isFirstInversion, _doReorder;
+	size_t _majorIterationNr;
 	CachedImageSet _psfImages, _modelImages, _residualImages;
 	std::vector<PartitionedMS::Handle> _partitionedMSHandles;
 	FitsWriter _fitsWriter;

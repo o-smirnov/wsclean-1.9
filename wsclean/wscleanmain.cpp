@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
 {
 	std::cout << "\n"
 		" ** This software package is released under the GPL version 3. **\n"
-	  " ** Author: Andre Offringa (offringa@gmail.com).               **\n\n";
+	  " ** Author: André Offringa (offringa@gmail.com).               **\n\n";
 	
 	if(argc < 2)
 	{
@@ -37,10 +37,15 @@ int main(int argc, char *argv[])
 			"\t   Experimental mode to speed up inversion.\n"
 			"\t-smallpsf\n"
 			"\t   Resize the psf to speed up minor clean iterations. Not the default.\n"
-			"\t-pol <xx, yy, xy, yx or stokesi>\n"
-			"\t   Default: stokesi.\n"
+			"\t-pol <list>\n"
+			"\t   Default: \'I\'. Possible values: XX, XY, YX, YY, I, Q, U, V, RR, RL, LR or LL (case insensitive).\n"
+			"\t   Multiple values can be separated with commas, e.g.: 'xx,xy,yx,yy'. Four polarizations can be joinedly\n"
+			"\t   clean (see '-joinpolarizations'), but this is not the default. I, Q, U and V polarizations will be\n"
+			"\t   directly calculated from the visibilities, which is not appropriate for telescopes with non-orthogonal\n"
+			"\t   feeds, such as MWA and LOFAR. The 'xy' polarization will output both a real and an imaginary image,\n"
+			"\t   which allows calculating true Stokes polarizations for those telescopes.\n"
 			"\t-gridmode <nn or kb>\n"
-			"\t   Kernel and mode used for gridding: kb = Kaiser-Bessel (currently 7 pixels), nn = nearest\n"
+			"\t   Kernel and mode used for gridding: kb = Kaiser-Bessel (default with 7 pixels), nn = nearest\n"
 			"\t   neighbour (no kernel). Default: kb.\n"
 			"\t-nonegative\n"
 			"\t   Do not allow negative components during cleaning. Not the default.\n"
@@ -82,21 +87,40 @@ int main(int argc, char *argv[])
 			"\t   Force or disable reordering of Measurement Set. This can be faster when the measurement set needs to\n"
 			"\t   be iterated several times, such as with many major iterations or in channel imaging mode.\n"
 			"\t   Default: only reorder when in channel imaging mode.\n"
-			"\t-join-channels\n"
+			"\t-joinpolarizations\n"
+			"\t   Perform cleaning by searching for peaks in the sum of squares of the polarizations (either I^2+Q^2+U^2+V^2\n"
+			"\t   or XX^2+real(XY)^2+imag(XY)^2+YY^2), but subtract components from individual channels. Only possible when\n"
+			"\t   imaging all Stokes or all linear parameters. Default: off.\n"
+			"\t-joinchannels\n"
+			"\t   Perform cleaning by searching for peaks in the MFS image, but subtract components from individual channels.\n"
+			"\t   This will turn on mfsweighting by default. Default: off.\n"
+			"\t-mfsweighting\n"
+			"\t   In spectral mode, calculate the weights as if the image was made using MFS. This makes sure that the sum of\n"
+			"\t   channel images equals the MFS weights. Otherwise, the channel image will become a bit more naturally weighted.\n"
+			"\t   This is only relevant for weighting modes that require gridding (i.e., Uniform, Briggs').\n"
+			"\t   Default: off, unless -joinchannels is specified.\n"
+			"\t-nomfsweighting\n"
+			"\t   Opposite of -mfsweighting; can be used to turn off MFS weighting in -joinchannels mode.\n"
 			"\t-addmodel <modelfile>\n"
 			"\t-addmodelapp <modelfile>\n"
 			"\t-savemodel <modelfile>\n"
-			"\t-wlimit <percentage>\n"
-			"\t   Do not grid visibilities with a w-value higher than the given percentage of the max w, to save speed\n"
+			"\t-maxuvw <meters>\n"
+			"\t-minuvw <meters>\n"
+			"\t   Set the min/max baseline distance in meters.\n"
+			"\t-maxw <percentage>\n"
+			"\t   Do not grid visibilities with a w-value higher than the given percentage of the max w, to save speed.\n"
 			"\t   Default: grid everything\n"
 			"\t-mem <percentage>\n"
 			"\t   Limit memory usage to the given fraction of the total system memory. This is an approximate value.\n"
-			"\t   Default: 100.\n";
+			"\t   Default: 100.\n"
+			"\t-absmem <memory limit>\n"
+			"\t   Like -mem, but this specifies a fixed amount of memory in gigabytes.\n";
 		return -1;
 	}
 	
 	WSClean wsclean;
 	int argi = 1;
+	bool mfsWeighting = false, noMFSWeighting = false;
 	while(argi < argc && argv[argi][0] == '-')
 	{
 		const std::string param = &argv[argi][1];
@@ -231,6 +255,26 @@ int main(int argc, char *argv[])
 			++argi;
 			wsclean.SetChannelsOut(atoi(argv[argi]));
 		}
+		else if(param == "joinpolarizations")
+		{
+			wsclean.SetJoinPolarizations(true);
+		}
+		else if(param == "joinchannels")
+		{
+			wsclean.SetJoinChannels(true);
+		}
+		else if(param == "mfsweighting")
+		{
+			mfsWeighting = true;
+		}
+		else if(param == "nomfsweighting")
+		{
+			noMFSWeighting = true;
+		}
+		else if(param == "joinchannels")
+		{
+			wsclean.SetJoinChannels(true);
+		}
 		else if(param == "field")
 		{
 			++argi;
@@ -293,7 +337,17 @@ int main(int argc, char *argv[])
 			++argi;
 			wsclean.SetMemAbsLimit(atof(argv[argi]));
 		}
-		else if(param == "wlimit")
+		else if(param == "minuvw")
+		{
+			++argi;
+			wsclean.SetMinUVW(atof(argv[argi]));
+		}
+		else if(param == "maxuvw")
+		{
+			++argi;
+			wsclean.SetMaxUVW(atof(argv[argi]));
+		}
+		else if(param == "maxw")
 		{
 			// This was to test the optimization suggested in Tasse et al., 2013, Appendix C.
 			++argi;
@@ -308,6 +362,8 @@ int main(int argc, char *argv[])
 	
 	if(argi == argc)
 		throw std::runtime_error("No input measurement sets given.");
+	
+	wsclean.SetMFSWeighting((wsclean.JoinedFrequencyCleaning() && !noMFSWeighting) || mfsWeighting);
 	
 	for(int i=argi; i != argc; ++i)
 		wsclean.AddInputMS(argv[i]);
