@@ -113,15 +113,15 @@ int main(int argc, char *argv[])
 			"-joinchannels\n"
 			"   Perform cleaning by searching for peaks in the MFS image, but subtract components from individual channels.\n"
 			"   This will turn on mfsweighting by default. Default: off.\n"
-			"-multiscale\n"
-			"   Clean on different scales. This is a new experimental algorithm. Default: off.\n"
-			"-multiscale-threshold-bias\n"
-			"   Parameter to lower the threshold for larger scales. The used threshold for a scale\n"
-			"   is threshold(scale)=pointsource_threshold x tbias^scale. A lower bias will clean\n"
-			"   larger scales deeper. Default: 0.7\n"
-			"-multiscale-scale-bias\n"
-			"   Parameter to prevent cleaning small scales in the large-scale iterations. A higher\n"
-			"   bias will give more focus to larger scales. Default: 0.6\n"
+			//			"-multiscale\n"
+			//			"   Clean on different scales. This is a new experimental algorithm. Default: off.\n"
+			//			"-multiscale-threshold-bias\n"
+			//			"   Parameter to lower the threshold for larger scales. The used threshold for a scale\n"
+			//			"   is threshold(scale)=pointsource_threshold x tbias^scale. A lower bias will clean\n"
+			//			"   larger scales deeper. Default: 0.7\n"
+			//			"-multiscale-scale-bias\n"
+			//			"   Parameter to prevent cleaning small scales in the large-scale iterations. A higher\n"
+			//			"   bias will give more focus to larger scales. Default: 0.6\n"
 			"-cleanborder <percentage>\n"
 			"   Set the border size in which no cleaning is performed, in percentage of the width/height of the image.\n"
 			"   With an image size of 1000 and clean border of 1%, each border is 10 pixels. Default: 5 (%).\n"
@@ -297,7 +297,7 @@ int main(int argc, char *argv[])
 		{
 			mfsWeighting = true;
 		}
-		else if(param == "multiscale")
+		/*else if(param == "multiscale")
 		{
 			wsclean.SetMultiscale(true);
 		}
@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
 		{
 			++argi;
 			wsclean.SetMultiscaleScaleBias(atof(argv[argi]));
-		}
+			}*/
 		else if(param == "cleanborder")
 		{
 			++argi;
