@@ -4,12 +4,16 @@
 #include "../modelsource.h"
 #include "../model.h"
 
+#include <unistd.h>
+
 CleanAlgorithm::CleanAlgorithm() :
 	_threshold(0.0),
 	_subtractionGain(0.1),
 	_stopGain(1.0),
+	_cleanBorderRatio(0.05),
 	_maxIter(500),
 	_iterationNumber(0),
+	_threadCount(sysconf(_SC_NPROCESSORS_ONLN)),
 	_allowNegativeComponents(true),
 	_stopOnNegativeComponent(false),
 	_cleanAreas(0)

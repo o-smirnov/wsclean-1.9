@@ -7,6 +7,10 @@
 #include <stdexcept>
 #include <mutex>
 
+//#define USE_DIRECT_ALLOCATOR
+
+#ifndef USE_DIRECT_ALLOCATOR
+
 template<typename NumType>
 class ImageBufferAllocator
 {
@@ -47,10 +51,9 @@ public:
 			totalSize += double(i->size) * double(sizeof(NumType)*2);
 		}
 		std::cout << "Image buf alloc stats:\n"
-			"   max alloc of real images = " << _nRealMax << "\n"
-			"max alloc of complex images = " << _nComplexMax << "\n"
+			"         max alloc'd images = " << _nRealMax << " real + " << _nComplexMax << " complex\n"
 			"       max allocated chunks = " << _buffers.size() << "\n"
-			"          max allocated mem = " << round(totalSize/1e8)/10.0 << " GB \n";
+			"      current allocated mem = " << round(totalSize/1e8)/10.0 << " GB \n";
 	}
 	
 	NumType* Allocate(size_t size)
@@ -210,5 +213,38 @@ private:
 	size_t _nReal, _nComplex, _nRealMax, _nComplexMax, _previousSize;
 	mutable std::mutex _mutex;
 };
+
+#else // USE_DIRECT_ALLOCATOR
+
+template<typename NumType>
+class ImageBufferAllocator
+{
+public:
+	void ReportStatistics() const
+	{
+	}
+	
+	NumType* Allocate(size_t size)
+	{
+		return new NumType[size];
+	}
+	
+	std::complex<NumType>* AllocateComplex(size_t size)
+	{
+		return new std::complex<NumType>[size];
+	}
+	
+	void Free(NumType* buffer)
+	{
+		delete[] buffer;
+	}
+	
+	void Free(std::complex<NumType>* buffer)
+	{
+		delete[] buffer;
+	}
+};
+
+#endif // USE_DIRECT_ALLOCATOR
 
 #endif

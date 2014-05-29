@@ -13,14 +13,15 @@
 #include <iostream>
 #include <limits>
 
-double SimpleClean::PartialFindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const class AreaSet &cleanAreas)
+double SimpleClean::FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const class AreaSet &cleanAreas)
 {
 	double peakMax = std::numeric_limits<double>::min();
 	size_t index = 0;
-	const double *imgIter = &image[startY*width];
 	x = 0; y = startY;
+	
 	for(size_t yi=startY; yi!=endY; ++yi)
 	{
+		const double *imgIter = &image[yi*width];
 		for(size_t xi=0; xi!=width; ++xi)
 		{
 			double value = *imgIter;
@@ -31,7 +32,7 @@ double SimpleClean::PartialFindPeak(const double *image, size_t width, size_t he
 				{
 					x = xi;
 					y = yi;
-					peakMax = std::fabs(*imgIter);
+					peakMax = std::fabs(value);
 				}
 			}
 			++index;
@@ -41,52 +42,61 @@ double SimpleClean::PartialFindPeak(const double *image, size_t width, size_t he
 	return image[x + y*width];
 }
 
-#ifdef __AVX__
+#if defined __AVX__ && !defined FORCE_NON_AVX
 template<bool AllowNegativeComponent>
-double SimpleClean::FindPeakAVX(const double *image, size_t width, size_t height, size_t &x, size_t &y)
+double SimpleClean::FindPeakAVX(const double *image, size_t width, size_t height, size_t &x, size_t &y, size_t startY, size_t endY, double borderRatio)
 {
 	double peakMax = std::numeric_limits<double>::min();
-	const double* imgIter = image;
-	const double* const endPtr = image + width * height - 4;
 	size_t peakIndex = 0;
-	size_t index = 0;
 	
 	__m256d mPeakMax = _mm256_set1_pd(peakMax);
-	const double *i=imgIter;
-	for(; i<endPtr; i+=4)
+	
+	const size_t horBorderSize = floor(width*borderRatio), verBorderSize = floor(height*borderRatio);
+	size_t xiStart = horBorderSize, xiEnd = width - horBorderSize;
+	size_t yiStart = std::max(startY, verBorderSize), yiEnd = std::min(endY, height - verBorderSize);
+	if(xiEnd < xiStart) xiEnd = xiStart;
+	if(yiEnd < yiStart) yiEnd = yiStart;
+	
+	for(size_t yi=yiStart; yi!=yiEnd; ++yi)
 	{
-		__m256d val = _mm256_loadu_pd(i);
-		if(AllowNegativeComponent) {
-			__m256d negVal = _mm256_sub_pd(_mm256_set1_pd(0.0), val);
-			val = _mm256_max_pd(val, negVal);
-		}
-		int mask = _mm256_movemask_pd(_mm256_cmp_pd(val, mPeakMax, _CMP_GT_OQ));
-		if(mask != 0)
+		size_t index = yi*width + xiStart;
+		const double* const endPtr = image + yi*width + xiEnd - 4;
+		const double *i=image + index;
+		for(; i<endPtr; i+=4)
 		{
-			for(size_t di=0; di!=4; ++di)
+			__m256d val = _mm256_loadu_pd(i);
+			if(AllowNegativeComponent) {
+				__m256d negVal = _mm256_sub_pd(_mm256_set1_pd(0.0), val);
+				val = _mm256_max_pd(val, negVal);
+			}
+			int mask = _mm256_movemask_pd(_mm256_cmp_pd(val, mPeakMax, _CMP_GT_OQ));
+			if(mask != 0)
 			{
-				double value = i[di];
-				if(AllowNegativeComponent) value = std::fabs(value);
-				if(value > peakMax)
+				for(size_t di=0; di!=4; ++di)
 				{
-					peakIndex = index+di;
-					peakMax = std::fabs(i[di]);
-					mPeakMax = _mm256_set1_pd(peakMax);
+					double value = i[di];
+					if(AllowNegativeComponent) value = std::fabs(value);
+					if(value > peakMax)
+					{
+						peakIndex = index+di;
+						peakMax = std::fabs(i[di]);
+						mPeakMax = _mm256_set1_pd(peakMax);
+					}
 				}
 			}
+			index+=4;
 		}
-		index+=4;
-	}
-	for(; i!=endPtr+4; ++i)
-	{
-		double value = *i;
-		if(AllowNegativeComponent) value = std::fabs(value);
-		if(value > peakMax)
+		for(; i!=endPtr+4; ++i)
 		{
-			peakIndex = index;
-			peakMax = std::fabs(*i);
+			double value = *i;
+			if(AllowNegativeComponent) value = std::fabs(value);
+			if(value > peakMax)
+			{
+				peakIndex = index;
+				peakMax = std::fabs(*i);
+			}
+			++index;
 		}
-		++index;
 	}
 	x = peakIndex % width;
 	y = peakIndex / width;
@@ -94,9 +104,9 @@ double SimpleClean::FindPeakAVX(const double *image, size_t width, size_t height
 }
 
 template
-double SimpleClean::FindPeakAVX<false>(const double *image, size_t width, size_t height, size_t &x, size_t &y);
+double SimpleClean::FindPeakAVX<false>(const double *image, size_t width, size_t height, size_t &x, size_t &y, size_t startY, size_t endY, double borderRatio);
 template
-double SimpleClean::FindPeakAVX<true>(const double *image, size_t width, size_t height, size_t &x, size_t &y);
+double SimpleClean::FindPeakAVX<true>(const double *image, size_t width, size_t height, size_t &x, size_t &y, size_t startY, size_t endY, double borderRatio);
 #else
 #warning "Not using AVX optimized version of FindPeak()!"
 #endif // __AVX__
@@ -270,7 +280,7 @@ void SimpleClean::PartialSubtractImageAVX(double *image, size_t imgWidth, size_t
 void SimpleClean::ExecuteMajorIterationST(double *dataImage, double *modelImage, const double *psfImage, size_t width, size_t height)
 {
 	size_t componentX, componentY;
-	double peak = FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents);
+	double peak = FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, CleanBorderRatio());
 	std::cout << "Initial peak: " << peak << '\n';
 	while(fabs(peak) > _threshold && _iterationNumber < _maxIter)
 	{
@@ -279,7 +289,7 @@ void SimpleClean::ExecuteMajorIterationST(double *dataImage, double *modelImage,
 		SubtractImage(dataImage, psfImage, width, height, componentX, componentY, _subtractionGain * peak);
 		modelImage[componentX + componentY*width] += _subtractionGain * peak;
 		
-		peak = FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents);
+		peak = FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, CleanBorderRatio());
 		++_iterationNumber;
 	}
 	std::cout << "Stopped on peak " << peak << '\n';
@@ -307,7 +317,7 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		_allowNegativeComponents = true;
 	
 	size_t componentX=0, componentY=0;
-	double peak = FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents);
+	double peak = FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, CleanBorderRatio());
 	std::cout << "Initial peak: " << peak << '\n';
 	double firstThreshold = _threshold, stopGainThreshold = fabs(peak*(1.0-_stopGain));
 	if(stopGainThreshold > firstThreshold)
@@ -319,11 +329,10 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		std::cout << "Major iteration threshold reached global threshold of " << _threshold << ": final major iteration.\n";
 	}
 
-	size_t cpuCount = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
-	std::vector<ao::lane<CleanTask>*> taskLanes(cpuCount);
-	std::vector<ao::lane<CleanResult>*> resultLanes(cpuCount);
+	std::vector<ao::lane<CleanTask>*> taskLanes(_threadCount);
+	std::vector<ao::lane<CleanResult>*> resultLanes(_threadCount);
 	boost::thread_group threadGroup;
-	for(size_t i=0; i!=cpuCount; ++i)
+	for(size_t i=0; i!=_threadCount; ++i)
 	{
 		taskLanes[i] = new ao::lane<CleanTask>(1);
 		resultLanes[i] = new ao::lane<CleanResult>(1);
@@ -334,8 +343,8 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		cleanThreadData.psfWidth = psfWidth;
 		cleanThreadData.psfHeight = psfHeight;
 		cleanThreadData.psfImage = psfImage;
-		cleanThreadData.startY = (height*i)/cpuCount;
-		cleanThreadData.endY = height*(i+1)/cpuCount;
+		cleanThreadData.startY = (height*i)/_threadCount;
+		cleanThreadData.endY = height*(i+1)/_threadCount;
 		threadGroup.add_thread(new boost::thread(&SimpleClean::cleanThreadFunc, this, &*taskLanes[i], &*resultLanes[i], cleanThreadData));
 	}
 	while(fabs(peak) > firstThreshold && _iterationNumber < _maxIter && (peak >= 0.0 || !_stopOnNegativeComponent))
@@ -350,13 +359,13 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		task.cleanCompX = componentX;
 		task.cleanCompY = componentY;
 		task.peakLevel = peak;
-		for(size_t i=0; i!=cpuCount; ++i)
+		for(size_t i=0; i!=_threadCount; ++i)
 			taskLanes[i]->write(task);
 		
 		modelImage[componentX + componentY*width] += _subtractionGain * peak;
 		
 		peak = 0.0;
-		for(size_t i=0; i!=cpuCount; ++i)
+		for(size_t i=0; i!=_threadCount; ++i)
 		{
 			CleanResult result;
 			resultLanes[i]->read(result);
@@ -370,16 +379,16 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		
 		++_iterationNumber;
 	}
-	for(size_t i=0; i!=cpuCount; ++i)
+	for(size_t i=0; i!=_threadCount; ++i)
 		taskLanes[i]->write_end();
 	threadGroup.join_all();
-	for(size_t i=0; i!=cpuCount; ++i)
+	for(size_t i=0; i!=_threadCount; ++i)
 	{
 		delete taskLanes[i];
 		delete resultLanes[i];
 	}
 	std::cout << "Stopped on peak " << peak << '\n';
-	reachedStopGain = fabs(peak) < stopGainThreshold;
+	reachedStopGain = (fabs(peak) <= stopGainThreshold) && (peak != 0.0);
 }
 
 void SimpleClean::cleanThreadFunc(ao::lane<CleanTask> *taskLane, ao::lane<CleanResult> *resultLane, CleanThreadData cleanData)
@@ -391,9 +400,9 @@ void SimpleClean::cleanThreadFunc(ao::lane<CleanTask> *taskLane, ao::lane<CleanR
 		
 		CleanResult result;
 		if(_cleanAreas == 0)
-			result.peakLevel = PartialFindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY);
+			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, CleanBorderRatio());
 		else
-			result.peakLevel = PartialFindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, *_cleanAreas);
+			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, *_cleanAreas);
 		
 		resultLane->write(result);
 	}
