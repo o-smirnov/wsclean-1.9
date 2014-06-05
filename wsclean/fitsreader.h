@@ -7,8 +7,9 @@
 #include <fitsio.h>
 
 #include "polarizationenum.h"
+#include "fitsiochecker.h"
 
-class FitsReader
+class FitsReader : protected FitsIOChecker
 {
 	public:
 		FitsReader(const std::string &filename) 
@@ -49,6 +50,7 @@ class FitsReader
 		const std::vector<std::string>& History() const { return _history; }
 		
 		bool ReadDoubleKeyIfExists(const char* key, double& dest) { return readDoubleKeyIfExists(key, dest); }
+		static double ParseFitsDateToMJD(const char* valueStr);
 	private:
 		float readFloatKey(const char* key);
 		double readDoubleKey(const char* key);
@@ -57,14 +59,12 @@ class FitsReader
 		std::string readStringKey(const char* key);
 		bool readStringKeyIfExists(const char* key, std::string& value, std::string& comment);
 		void readHistory();
-		double parseFitsDateToMJD(const char* valueStr);
 		bool readDateKeyIfExists(const char *key, double &dest);
 		
 		std::string _filename;
 		fitsfile *_fitsPtr;
 		
 		void initialize();
-		void checkStatus(int status, const std::string &operation=std::string());
 		
 		size_t _imgWidth, _imgHeight;
 		double _phaseCentreRA, _phaseCentreDec;
