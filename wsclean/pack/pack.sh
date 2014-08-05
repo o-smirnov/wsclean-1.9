@@ -11,7 +11,7 @@ else
 		mkdir /tmp/wsclean/msprovider
 		mkdir /tmp/wsclean/parser
 		cd ..
-		cp -v CMakeLists.txt areaset.* banddata.* beamevaluator.* buffered_lane.* cachedimageset.* fftconvolver.* fftresampler.* fitsreader.* fitswriter.* imagecoordinates.* imagebufferallocator.* imageweights.* inversionalgorithm.* lane.* layeredimager.* multibanddata.* nlplfitter.* matrix2x2.* model.* modelrenderer.* modelsource.* msselection.* polarizationenum.* progressbar.* radeccoord.* sourcesdf.* sourcesdfwithsamples.* spectralenergydistribution.* stopwatch.* tilebeam.* uvector.* uvwdistribution.* weightmode.* wsclean.* wscleanmain.cpp wsinversion.* /tmp/wsclean/
+		cp -v CMakeLists.txt areaset.* banddata.* beamevaluator.* buffered_lane.* cachedimageset.* fftconvolver.* fftresampler.* fitsiochecker.* fitsreader.* fitswriter.* imagecoordinates.* imagebufferallocator.* imageweights.* inversionalgorithm.* lane.* layeredimager.* multibanddata.* nlplfitter.* matrix2x2.* model.* modelrenderer.* modelsource.* msselection.* polarizationenum.* progressbar.* radeccoord.* sourcesdf.* sourcesdfwithsamples.* spectralenergydistribution.* stopwatch.* tilebeam.* uvector.* uvwdistribution.* weightmode.* wsclean.* wscleanmain.cpp wsinversion.* wscversion.h /tmp/wsclean/
 		cp -v aocommon/lane.h aocommon/lane_03.h aocommon/lane_11.h aocommon/uvector.h aocommon/uvector_03.h /tmp/wsclean/aocommon/
 		cp -v beam/*.{h,cpp} /tmp/wsclean/beam
 		cp -v cleanalgorithms/*.{h,cpp} /tmp/wsclean/cleanalgorithms/
@@ -27,4 +27,5 @@ else
 		cd build
 		cmake ../
 		make -j 12
+		cat ../wscversion.h
 fi
