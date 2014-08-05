@@ -1,4 +1,5 @@
 #include "wsclean.h"
+#include "wscversion.h"
 
 #include <boost/algorithm/string.hpp>
 
@@ -7,12 +8,13 @@
 int main(int argc, char *argv[])
 {
 	std::cout << "\n"
-		" ** This software package is released under the GPL version 3. **\n"
-	  " ** Author: André Offringa (offringa@gmail.com).               **\n\n";
+		"WSClean version " WSCLEAN_VERSION_STR " (" WSCLEAN_VERSION_DATE ")\n"
+		"This software package is released under the GPL version 3.\n"
+	  "Author: André Offringa (offringa@gmail.com).\n\n";
 #ifndef NDEBUG
 	std::cout << "\n"
 		"WARNING: Symbol NDEBUG was not defined; this WSClean version was\n"
-		"compiled as a DEBUG version. This can seriously affect performance!\n";
+		"compiled as a DEBUG version. This can seriously affect performance!\n\n";
 #endif
 	
 	if(argc < 2)
@@ -21,6 +23,10 @@ int main(int argc, char *argv[])
 			"Will create cleaned images of the input ms(es).\n"
 			"If multiple mses are specified, they need to be phase-rotated to the same point on the sky.\n\n"
 			"Options can be:\n\n"
+			"  ** GENERAL OPTIONS **\n"
+			"-version\n"
+			"   Print WSClean's version and exit.\n"
+			"\n"
 			"  ** INVERSION OPTIONS **\n"
 			"-name <image-prefix>\n"
 			"   Use image-prefix as prefix for output files. Default is 'wsclean'.\n"
@@ -77,11 +83,12 @@ int main(int argc, char *argv[])
 			"  ** DATA SELECTION OPTIONS **\n"
 			"-pol <list>\n"
 			"   Default: \'I\'. Possible values: XX, XY, YX, YY, I, Q, U, V, RR, RL, LR or LL (case insensitive).\n"
-			"   Multiple values can be separated with commas, e.g.: 'xx,xy,yx,yy'. Four polarizations can be joinedly\n"
-			"   clean (see '-joinpolarizations'), but this is not the default. I, Q, U and V polarizations will be\n"
-			"   directly calculated from the visibilities, which is not appropriate for telescopes with non-orthogonal\n"
-			"   feeds, such as MWA and LOFAR. The 'xy' polarization will output both a real and an imaginary image,\n"
-			"   which allows calculating true Stokes polarizations for those telescopes.\n"
+			"   Multiple values can be separated with commas, e.g.: 'xx,xy,yx,yy'. Two or four polarizations can be\n"
+			"   joinedly cleaned (see '-joinpolarizations'), but this is not the default. I, Q, U and V\n"
+			"   polarizations will be directly calculated from the visibilities, which is not appropriate for\n"
+			"   telescopes with non-orthogonal feeds, such as MWA and LOFAR. The 'xy' polarization will output both\n"
+			"   a real and an imaginary image, which allows calculating true Stokes polarizations for those\n"
+			"   telescopes.\n"
 			"-interval <start-index> <end-index>\n"
 			"   Only image the given time interval. Indices specify the timesteps, end index is exclusive.\n"
 			"   Default: image all time steps.\n"
@@ -112,9 +119,9 @@ int main(int argc, char *argv[])
 			"   Cleaning gain for major iterations: Ratio of peak that will be subtracted in each major\n"
 			"   iteration. To use major iterations, 0.85 is a good value. Default: 1.0\n"
 			"-joinpolarizations\n"
-			"   Perform cleaning by searching for peaks in the sum of squares of the polarizations (either I^2+Q^2+U^2+V^2\n"
-			"   or XX^2+real(XY)^2+imag(XY)^2+YY^2), but subtract components from individual channels. Only possible when\n"
-			"   imaging all Stokes or all linear parameters. Default: off.\n"
+			"   Perform cleaning by searching for peaks in the sum of squares of the polarizations (either\n"
+			"   I^2+Q^2+U^2+V^2, XX^2+real(XY)^2+imag(XY)^2+YY^2, or XX^2+YY^2), but subtract components from\n"
+			"   individual channels. Only possible when imaging all Stokes or all linear parameters. Default: off.\n"
 			"-joinchannels\n"
 			"   Perform cleaning by searching for peaks in the MFS image, but subtract components from individual channels.\n"
 			"   This will turn on mfsweighting by default. Default: off.\n"
@@ -151,8 +158,13 @@ int main(int argc, char *argv[])
 	bool mfsWeighting = false, noMFSWeighting = false, predictionMode = false;
 	while(argi < argc && argv[argi][0] == '-')
 	{
-		const std::string param = &argv[argi][1];
-		if(param == "predict")
+		const std::string param = argv[argi][1]=='-' ? (&argv[argi][2]) : (&argv[argi][1]);
+		if(param == "version")
+		{
+			// version already printed: just exit
+			return 0;
+		}
+		else if(param == "predict")
 		{
 			predictionMode = true;
 		}

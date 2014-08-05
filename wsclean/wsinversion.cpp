@@ -139,6 +139,7 @@ void WSInversion::initializeMeasurementSet(MSProvider& msProvider, WSInversion::
 		double wHi = fabs(wInM / curBand.SmallestWavelength());
 		double wLo = fabs(wInM / curBand.LongestWavelength());
 		double baselineInM = sqrt(uInM*uInM + vInM*vInM + wInM*wInM);
+		double halfWidth = 0.5*ImageWidth(), halfHeight = 0.5*ImageHeight();
 		if(wHi > msData.maxW || wLo < msData.minW || baselineInM / curBand.SmallestWavelength() > maxBaseline)
 		{
 			msProvider.ReadWeights(weightArray.data());
@@ -148,9 +149,18 @@ void WSInversion::initializeMeasurementSet(MSProvider& msProvider, WSInversion::
 				if(*weightPtr != 0.0)
 				{
 					const double wavelength = curBand.ChannelWavelength(ch);
-					msData.maxW = std::max(msData.maxW, fabs(wInM / wavelength));
-					msData.minW = std::min(msData.minW, fabs(wInM / wavelength));
-					maxBaseline = std::max(maxBaseline, baselineInM / wavelength);
+					double
+						uInL = uInM/wavelength, vInL = vInM/wavelength,
+						wInL = wInM/wavelength,
+						x = uInL * PixelSizeX() * ImageWidth(),
+						y = vInL * PixelSizeY() * ImageHeight();
+					if(floor(x) > -halfWidth  && ceil(x) < halfWidth &&
+						 floor(y) > -halfHeight && ceil(y) < halfHeight)
+					{
+						msData.maxW = std::max(msData.maxW, fabs(wInL));
+						msData.minW = std::min(msData.minW, fabs(wInL));
+						maxBaseline = std::max(maxBaseline, baselineInM / wavelength);
+					}
 				}
 				++weightPtr;
 			}
@@ -599,6 +609,11 @@ void WSInversion::Invert()
 
 void WSInversion::Predict(double* real, double* imaginary)
 {
+	if(imaginary==0 && IsComplex())
+		throw std::runtime_error("Missing imaginary in complex prediction");
+	if(imaginary!=0 && !IsComplex())
+		throw std::runtime_error("Imaginary specified in non-complex prediction");
+	
 	MSData* msDataVector = new MSData[MeasurementSetCount()];
 	_hasFrequencies = false;
 	for(size_t i=0; i!=MeasurementSetCount(); ++i)

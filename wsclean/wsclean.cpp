@@ -411,6 +411,7 @@ void WSClean::initializeCleanAlgorithm()
 
 void WSClean::prepareInversionAlgorithm(PolarizationEnum polarization)
 {
+	static_cast<WSInversion&>(*_inversionAlgorithm).SetGridMode(_gridMode);
 	_inversionAlgorithm->SetImageWidth(_imgWidth);
 	_inversionAlgorithm->SetImageHeight(_imgHeight);
 	_inversionAlgorithm->SetPixelSizeX(_pixelScaleX);
@@ -447,13 +448,17 @@ void WSClean::checkPolarizations()
 		else 
 			throw std::runtime_error("Joined polarization cleaning requested, but neither 2 or 4 polarizations are imaged that are suitable for this");
 	}
+	else {
+		if((_polarizations.count(Polarization::XY)!=0 || _polarizations.count(Polarization::YX)!=0) && _nIter!=0)
+			throw std::runtime_error("You are imaging XY and/or YX polarizations and have enabled cleaning (niter!=0). This is not possible -- you have to specify '-joinpolarizations' or disable cleaning.");
+	}
 }
 
-void WSClean::performReordering()
+void WSClean::performReordering(bool isPredictMode)
 {
 	for(std::vector<std::string>::const_iterator i=_filenames.begin(); i != _filenames.end(); ++i)
 	{
-		_partitionedMSHandles.push_back(PartitionedMS::Partition(*i, _channelsOut, _globalSelection, _columnName, true, _mGain != 1.0, _polarizations));
+		_partitionedMSHandles.push_back(PartitionedMS::Partition(*i, _channelsOut, _globalSelection, _columnName, true, _mGain != 1.0 || isPredictMode, _polarizations));
 	}
 }
 
@@ -477,7 +482,7 @@ void WSClean::RunClean()
 	
 	_doReorder = preferReordering();
 	
-	if(_doReorder) performReordering();
+	if(_doReorder) performReordering(false);
 	
 	_firstMSBand = MultiBandData(casa::MeasurementSet(_filenames[0]).spectralWindow(), casa::MeasurementSet(_filenames[0]).dataDescription());
 	_weightPerChannel.assign(_channelsOut, 0);
@@ -536,7 +541,7 @@ void WSClean::RunPredict()
 	
 	_doReorder = preferReordering();
 	
-	if(_doReorder) performReordering();
+	if(_doReorder) performReordering(true);
 	
 	_firstMSBand = MultiBandData(casa::MeasurementSet(_filenames[0]).spectralWindow(), casa::MeasurementSet(_filenames[0]).dataDescription());
 	
@@ -566,7 +571,6 @@ void WSClean::selectChannels(MSSelection& selection, size_t outChannelIndex, siz
 void WSClean::runIndependentChannel(size_t outChannelIndex)
 {
 	_inversionAlgorithm.reset(new WSInversion(&_imageAllocator, _threadCount, _memFraction, _absMemLimit));
-	static_cast<WSInversion&>(*_inversionAlgorithm).SetGridMode(_gridMode);
 	
 	size_t  joinedChannelsOut;
 	if(_joinedFrequencyCleaning)
@@ -653,10 +657,13 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 								_residualImages.Load(residualImage, *curPol, ch, false);
 								std::cout << "Writing residual image... " << std::flush;
 								writeFits("residual.fits", residualImage, *curPol, currentChannelIndex, false);
-								if(Polarization::IsComplex(*curPol))
-									writeFits("residual.fits", residualImage, *curPol, currentChannelIndex, true);
-								_imageAllocator.Free(residualImage);
 								std::cout << "DONE\n";
+								if(Polarization::IsComplex(*curPol))
+								{
+									_residualImages.Load(residualImage, *curPol, ch, true);
+									writeFits("residual.fits", residualImage, *curPol, currentChannelIndex, true);
+								}
+								_imageAllocator.Free(residualImage);
 							}
 						}
 					} // end of polarization loop
@@ -754,21 +761,28 @@ void WSClean::predictChannel(size_t outChannelIndex)
 	for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
 	{
 		// load image(s) from disk
-		FitsReader reader(getPrefix(*curPol, outChannelIndex, false) + "-model.fits");
-		double* buffer = _imageAllocator.Allocate(_imgWidth*_imgHeight);
-		if(reader.ImageWidth()!=_imgWidth || reader.ImageHeight()!=_imgHeight)
-			throw std::runtime_error("Inconsistent image size: input image did not match with specified dimensions.");
-		reader.Read(buffer);
-		_modelImages.Store(buffer, *curPol, false, 0);
-		if(Polarization::IsComplex(*curPol))
+		if(*curPol != Polarization::YX || _polarizations.count(Polarization::XY)==0)
 		{
-			reader = FitsReader(getPrefix(*curPol, outChannelIndex, true) + "-model.fits");
+			FitsReader reader(getPrefix(*curPol, outChannelIndex, false) + "-model.fits");
+			_fitsWriter = FitsWriter(reader);
+			_modelImages.SetFitsWriter(_fitsWriter);
+			std::cout << "Reading " << reader.Filename() << "...\n";
+			double* buffer = _imageAllocator.Allocate(_imgWidth*_imgHeight);
 			if(reader.ImageWidth()!=_imgWidth || reader.ImageHeight()!=_imgHeight)
 				throw std::runtime_error("Inconsistent image size: input image did not match with specified dimensions.");
 			reader.Read(buffer);
-			_modelImages.Store(buffer, *curPol, true, 0);
+			_modelImages.Store(buffer, *curPol, 0, false);
+			if(*curPol == Polarization::XY)
+			{
+				reader = FitsReader(getPrefix(Polarization::XY, outChannelIndex, true) + "-model.fits");
+				std::cout << "Reading " << reader.Filename() << "...\n";
+				if(reader.ImageWidth()!=_imgWidth || reader.ImageHeight()!=_imgHeight)
+					throw std::runtime_error("Inconsistent image size: input image did not match with specified dimensions.");
+				reader.Read(buffer);
+				_modelImages.Store(buffer, Polarization::XY, 0, true);
+			}
+			_imageAllocator.Free(buffer);
 		}
-		_imageAllocator.Free(buffer);
 		
 		prepareInversionAlgorithm(*curPol);
 		
@@ -871,7 +885,7 @@ void WSClean::performClean(size_t currentChannelIndex, bool& reachedMajorThresho
 			else throw std::runtime_error("Incompatible polarization combination for joined polarization cleaning");
 		}
 		else
-			throw std::runtime_error("Can only joinedly clean frequencies when cleaning all polarizations simultaneously");
+			throw std::runtime_error("Can only joinedly clean frequencies when cleaning all polarizations simultaneously. Image at least two polarizations and provide the '-joinpolarizations' option to enable this.");
 	}
 	else if(_joinedPolarizationCleaning) {
 		if(Polarization::HasFullPolarization(_polarizations))
@@ -897,6 +911,7 @@ void WSClean::performSimpleClean(CleanAlgorithm& cleanAlgorithm, size_t currentC
 		modelImage(_imgWidth*_imgHeight, _imageAllocator);
 	double
 		*psfImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
+		
 	_residualImages.Load(residualImage.Data(), polarization, 0, false);
 	_modelImages.Load(modelImage.Data(), polarization, 0, false);
 	_psfImages.Load(psfImage, polarization, 0, false);
