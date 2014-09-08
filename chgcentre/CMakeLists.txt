@@ -39,6 +39,6 @@ ENDIF("${isSystemDir}" STREQUAL "-1")
 
 add_executable(chgcentre main.cpp progressbar.cpp)
 
-target_link_libraries(chgcentre ${CASA_LIBS} ${LAPACK_lapack_LIBRARY})
+target_link_libraries(chgcentre ${CASA_LIBS} ${LAPACK_lapack_LIBRARY} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 
 install (TARGETS chgcentre DESTINATION bin)
