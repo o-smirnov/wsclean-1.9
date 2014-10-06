@@ -21,6 +21,7 @@
 #include "banddata.h"
 #include "progressbar.h"
 #include "imagecoordinates.h"
+#include "multibanddata.h"
 
 using namespace casa;
 
@@ -91,7 +92,7 @@ void processField(
 	MeasurementSet &set, int fieldIndex, MSField &fieldTable, const MDirection &newDirection,
 	bool onlyUVW, bool shiftback)
 {
-	BandData bandData(set.spectralWindow());
+	MultiBandData bandData(set.spectralWindow(), set.dataDescription());
 	ROScalarColumn<casa::String> nameCol(fieldTable, fieldTable.columnName(MSFieldEnums::NAME));
 	MDirection::ArrayColumn phaseDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::PHASE_DIR));
 	MEpoch::ROScalarColumn timeCol(set, set.columnName(MSMainEnums::TIME));
@@ -101,7 +102,8 @@ void processField(
 	ROScalarColumn<int>
 		antenna1Col(set, set.columnName(MSMainEnums::ANTENNA1)),
 		antenna2Col(set, set.columnName(MSMainEnums::ANTENNA2)),
-		fieldIdCol(set, set.columnName(MSMainEnums::FIELD_ID));
+		fieldIdCol(set, set.columnName(MSMainEnums::FIELD_ID)),
+		dataDescIdCol(set, set.columnName(MSMainEnums::DATA_DESC_ID));
 	Muvw::ROScalarColumn
 		uvwCol(set, set.columnName(MSMainEnums::UVW));
 	ArrayColumn<double>
@@ -170,7 +172,8 @@ void processField(
 				// Read values from set
 				const int
 					antenna1 = antenna1Col(row),
-					antenna2 = antenna2Col(row);
+					antenna2 = antenna2Col(row),
+					dataDescId = dataDescIdCol(row);
 				const Muvw oldUVW = uvwCol(row);
 				
 				MEpoch rowTime = timeCol(row);
@@ -209,21 +212,22 @@ void processField(
 				
 				if(!onlyUVW)
 				{
+					const BandData& thisBand = bandData[dataDescId];
 					dataCol->get(row, *dataArray);
-					rotateVisibilities(bandData, shiftFactor, polarizationCount, dataArray->cbegin());
+					rotateVisibilities(thisBand, shiftFactor, polarizationCount, dataArray->cbegin());
 					dataCol->put(row, *dataArray);
 						
 					if(hasCorrData)
 					{
 						correctedDataCol->get(row, *dataArray);
-						rotateVisibilities(bandData, shiftFactor, polarizationCount, dataArray->cbegin());
+						rotateVisibilities(thisBand, shiftFactor, polarizationCount, dataArray->cbegin());
 						correctedDataCol->put(row, *dataArray);
 					}
 					
 					if(hasModelData)
 					{
 						modelDataCol->get(row, *dataArray);
-						rotateVisibilities(bandData, shiftFactor, polarizationCount, dataArray->cbegin());
+						rotateVisibilities(thisBand, shiftFactor, polarizationCount, dataArray->cbegin());
 						modelDataCol->put(row, *dataArray);
 					}
 				}
