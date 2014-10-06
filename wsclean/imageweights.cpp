@@ -8,15 +8,18 @@
 #include <iostream>
 #include <cstring>
 
-ImageWeights::ImageWeights(size_t imageWidth, size_t imageHeight, double pixelScaleX, double pixelScaleY, double superWeight) :
+ImageWeights::ImageWeights(const WeightMode& weightMode, size_t imageWidth, size_t imageHeight, double pixelScaleX, double pixelScaleY, double superWeight) :
+	_weightMode(weightMode),
 	_imageWidth(round(double(imageWidth) / superWeight)),
 	_imageHeight(round(double(imageHeight) / superWeight)),
 	_pixelScaleX(pixelScaleX),
-	_pixelScaleY(pixelScaleY)
+	_pixelScaleY(pixelScaleY),
+	_totalSum(0.0),
+	_isGriddingFinished(false)
 {
 	if(_imageWidth%2 != 0) ++_imageWidth;
 	if(_imageHeight%2 != 0) ++_imageHeight;
-	_sum.assign(_imageWidth*_imageHeight/2, 0.0);
+	_grid.assign(_imageWidth*_imageHeight/2, 0.0);
 }
 
 double ImageWeights::ApplyWeights(std::complex<float> *data, const bool *flags, double uTimesLambda, double vTimesLambda, size_t channelCount, double lowestFrequency, double frequencyStep)
@@ -40,8 +43,10 @@ double ImageWeights::ApplyWeights(std::complex<float> *data, const bool *flags, 
 	return weightSum / channelCount;
 }
 
-void ImageWeights::Grid(casa::MeasurementSet& ms, WeightMode weightMode, const MSSelection& selection)
+void ImageWeights::Grid(casa::MeasurementSet& ms, const MSSelection& selection)
 {
+	if(_isGriddingFinished)
+		throw std::runtime_error("Grid() called after a call to FinishGridding()");
 	const MultiBandData bandData(ms.spectralWindow(), ms.dataDescription());
 	casa::ROScalarColumn<int> antenna1Column(ms, casa::MS::columnName(casa::MSMainEnums::ANTENNA1));
 	casa::ROScalarColumn<int> antenna2Column(ms, casa::MS::columnName(casa::MSMainEnums::ANTENNA2));
@@ -67,7 +72,6 @@ void ImageWeights::Grid(casa::MeasurementSet& ms, WeightMode weightMode, const M
 	casa::Array<casa::Complex> dataArr(shape);
 	casa::Array<bool> flagArr(shape);
 	casa::Array<float> weightArr(shape);
-	double totalSum = 0.0;
 	size_t timestep = 0;
 	double time = timeColumn(0);
 	
@@ -126,9 +130,8 @@ void ImageWeights::Grid(casa::MeasurementSet& ms, WeightMode weightMode, const M
 						if(!*flagIter)
 						{
 								size_t index = (size_t) x + (size_t) y*_imageWidth;
-								_sum[index] += *weightIter;
-								if(weightMode.IsBriggs())
-									totalSum += *weightIter;
+								_grid[index] += *weightIter;
+								_totalSum += *weightIter;
 						}
 						++flagIter;
 						++weightIter;
@@ -144,31 +147,18 @@ void ImageWeights::Grid(casa::MeasurementSet& ms, WeightMode weightMode, const M
 			}
 		}
 	}
-	// TODO this is not right: can't update Sum here since there might be more mses be gridded
-	if(weightMode.IsBriggs())
-	{
-		double avgW = 0.0;
-		for(ao::uvector<double>::const_iterator i=_sum.begin(); i!=_sum.end(); ++i)
-			avgW += *i * *i;
-		avgW /= totalSum;
-		double numeratorSqrt = 5.0 * exp10(-weightMode.BriggsRobustness());
-		double sSq = numeratorSqrt*numeratorSqrt / avgW;
-		for(ao::uvector<double>::iterator i=_sum.begin(); i!=_sum.end(); ++i)
-		{
-			*i = 1.0 / (1.0 + *i * sSq);
-		}
-	}
 }
 
-void ImageWeights::Grid(MSProvider& msProvider, WeightMode weightMode, const MSSelection& selection)
+void ImageWeights::Grid(MSProvider& msProvider, const MSSelection& selection)
 {
+	if(_isGriddingFinished)
+		throw std::runtime_error("Grid() called after a call to FinishGridding()");
 	const MultiBandData bandData(msProvider.MS().spectralWindow(), msProvider.MS().dataDescription());
 	MultiBandData selectedBand;
 	if(selection.HasChannelRange())
 		selectedBand = MultiBandData(bandData, selection.ChannelRangeStart(), selection.ChannelRangeEnd());
 	else
 		selectedBand = bandData;
-	double totalSum = 0.0;
 	std::vector<float> weightBuffer(selectedBand.MaxChannels());
 	
 	msProvider.Reset();
@@ -197,32 +187,49 @@ void ImageWeights::Grid(MSProvider& msProvider, WeightMode weightMode, const MSS
 			if(x >= 0.0 && x < _imageWidth && y < _imageHeight/2)
 			{
 				size_t index = (size_t) x + (size_t) y*_imageWidth;
-				_sum[index] += *weightIter;
-				if(weightMode.IsBriggs())
-					totalSum += *weightIter;
+				_grid[index] += *weightIter;
+				_totalSum += *weightIter;
 			}
 			++weightIter;
 		}
 	} while(msProvider.NextRow());
+}
+
+void ImageWeights::FinishGridding()
+{
+	if(_isGriddingFinished)
+		throw std::runtime_error("FinishGridding() called twice");
+	_isGriddingFinished = true;
 	
-	// TODO this is not right: can't update Sum here since there might be more mses be gridded
-	if(weightMode.IsBriggs())
+	if(_weightMode.IsBriggs())
 	{
 		double avgW = 0.0;
-		for(ao::uvector<double>::const_iterator i=_sum.begin(); i!=_sum.end(); ++i)
+		for(ao::uvector<double>::const_iterator i=_grid.begin(); i!=_grid.end(); ++i)
 			avgW += *i * *i;
-		avgW /= totalSum;
-		double numeratorSqrt = 5.0 * exp10(-weightMode.BriggsRobustness());
+		avgW /= _totalSum;
+		double numeratorSqrt = 5.0 * exp10(-_weightMode.BriggsRobustness());
 		double sSq = numeratorSqrt*numeratorSqrt / avgW;
-		for(ao::uvector<double>::iterator i=_sum.begin(); i!=_sum.end(); ++i)
+		for(ao::uvector<double>::iterator i=_grid.begin(); i!=_grid.end(); ++i)
 		{
 			*i = 1.0 / (1.0 + *i * sSq);
+		}
+	}
+	else if(_weightMode.IsUniform())
+	{
+		for(ao::uvector<double>::iterator i=_grid.begin(); i!=_grid.end(); ++i)
+		{
+			if(*i != 0.0)
+				*i = 1.0 / *i;
+			else
+				*i = 0.0;
 		}
 	}
 }
 
 void ImageWeights::Grid(const std::complex<float> *data, const bool *flags, double uTimesLambda, double vTimesLambda, size_t channelCount, double lowestFrequency, double frequencyStep)
 {
+	if(_isGriddingFinished)
+		throw std::runtime_error("Grid() called after a call to FinishGridding()");
 	for(size_t ch=0;ch!=channelCount;++ch)
 	{
 		if(!flags[ch])
@@ -239,7 +246,7 @@ void ImageWeights::Grid(const std::complex<float> *data, const bool *flags, doub
 			if(x >= 0.0 && x < _imageWidth && y < _imageHeight/2)
 			{
 				size_t index = (size_t) x + (size_t) y*_imageWidth;
-				_sum[index] += 1.0;
+				_grid[index] += 1.0;
 			}
 		}
 	}

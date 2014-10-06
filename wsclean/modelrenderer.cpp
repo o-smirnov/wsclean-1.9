@@ -114,7 +114,6 @@ void ModelRenderer::RenderModel(NumType* imageData, size_t imageWidth, size_t im
 {
 	for(Model::const_iterator src=model.begin(); src!=model.end(); ++src)
 	{
-		std::cout << "Rendering " << src->Name() << '\n';
 		for(ModelSource::const_iterator comp=src->begin(); comp!=src->end(); ++comp)
 		{
 			long double
@@ -123,6 +122,7 @@ void ModelRenderer::RenderModel(NumType* imageData, size_t imageWidth, size_t im
 				sourceL, sourceM;
 			int sourceX, sourceY;
 			ImageCoordinates::RaDecToLM(posRA, posDec, _phaseCentreRA, _phaseCentreDec, sourceL, sourceM);
+			sourceL -= _phaseCentreDL; sourceM -= _phaseCentreDM;
 			ImageCoordinates::LMToXY<long double>(sourceL, sourceM, _pixelScaleL, _pixelScaleM, imageWidth, imageHeight, sourceX, sourceY);
 			
 			const long double intFlux = comp->SED().IntegratedFlux(startFrequency, endFrequency, polarization);

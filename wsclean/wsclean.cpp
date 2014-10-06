@@ -37,7 +37,7 @@ WSClean::WSClean() :
 	_polarizations(),
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
-	_allowNegative(true), _smallPSF(false), _smallInversion(false), _stopOnNegative(false), _makePSF(false),
+	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false), _makePSF(false),
 	_forceReorder(false), _forceNoReorder(false), _joinedPolarizationCleaning(false), _joinedFrequencyCleaning(false),
 	_mfsWeighting(false), _multiscale(false),
 	_gridMode(LayeredImager::KaiserBessel),
@@ -261,13 +261,14 @@ void WSClean::initializeImageWeights(const MSSelection& partSelection)
 		}
 		else {
 			std::cout << "Precalculating weights for " << _weightMode.ToString() << " weighting... " << std::flush;
-			_imageWeights.reset(new ImageWeights(_imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
+			_imageWeights.reset(new ImageWeights(_weightMode, _imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
 			for(size_t i=0; i!=_inversionAlgorithm->MeasurementSetCount(); ++i)
 			{
-				_imageWeights->Grid(_inversionAlgorithm->MeasurementSet(i), _weightMode, partSelection);
+				_imageWeights->Grid(_inversionAlgorithm->MeasurementSet(i), partSelection);
 				if(_inversionAlgorithm->MeasurementSetCount() > 1)
 					std::cout << i << ' ' << std::flush;
 			}
+			_imageWeights->FinishGridding();
 			_inversionAlgorithm->SetPrecalculatedWeightInfo(_imageWeights.get());
 			std::cout << "DONE\n";
 		}
@@ -279,7 +280,7 @@ void WSClean::initializeMFSImageWeights()
 	if(_weightMode.RequiresGridding())
 	{
 		std::cout << "Precalculating MFS weights for " << _weightMode.ToString() << " weighting...\n";
-		_imageWeights.reset(new ImageWeights(_imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
+		_imageWeights.reset(new ImageWeights(_weightMode, _imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
 		for(size_t i=0; i!=_filenames.size(); ++i)
 		{
 			if(_doReorder)
@@ -289,15 +290,16 @@ void WSClean::initializeMFSImageWeights()
 					MSSelection partSelection(_globalSelection);
 					selectChannels(partSelection, ch, _channelsOut);
 					PartitionedMS msProvider(_partitionedMSHandles[i], ch, *_polarizations.begin());
-					_imageWeights->Grid(msProvider, _weightMode, partSelection);
+					_imageWeights->Grid(msProvider, partSelection);
 				}
 			}
 			else {
 				ContiguousMS msProvider(_filenames[i], _columnName, _globalSelection, *_polarizations.begin(), _mGain != 1.0);
-				_imageWeights->Grid(msProvider, _weightMode, _globalSelection);
+				_imageWeights->Grid(msProvider,  _globalSelection);
 				std::cout << '.' << std::flush;
 			}
 		}
+		_imageWeights->FinishGridding();
 	}
 }
 
@@ -647,25 +649,6 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 						
 						imageMainNonFirst(*curPol, ch);
 						clearCurMSProviders();
-					
-						if(!reachedMajorThreshold)
-						{
-							// This was the final major iteration: save results
-							if(!(*curPol == Polarization::YX && _polarizations.count(Polarization::XY)!=0))
-							{
-								double* residualImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
-								_residualImages.Load(residualImage, *curPol, ch, false);
-								std::cout << "Writing residual image... " << std::flush;
-								writeFits("residual.fits", residualImage, *curPol, currentChannelIndex, false);
-								std::cout << "DONE\n";
-								if(Polarization::IsComplex(*curPol))
-								{
-									_residualImages.Load(residualImage, *curPol, ch, true);
-									writeFits("residual.fits", residualImage, *curPol, currentChannelIndex, true);
-								}
-								_imageAllocator.Free(residualImage);
-							}
-						}
 					} // end of polarization loop
 					_currentPartSelection = selectionBefore;
 				} // end of joined channels loop
@@ -708,11 +691,13 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 				
 				for(std::vector<bool>::const_iterator isImaginary=imaginaryStates.begin(); isImaginary!=imaginaryStates.end(); ++isImaginary)
 				{
-					double* modelImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
-					_modelImages.Load(modelImage, *curPol, currentChannelIndex, *isImaginary);
 					double* restoredImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
 					_residualImages.Load(restoredImage, *curPol, currentChannelIndex, *isImaginary);
-					ModelRenderer renderer(_fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY);
+					if(_nIter != 0)
+						writeFits("residual.fits", restoredImage, *curPol, currentChannelIndex, *isImaginary);
+					double* modelImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
+					_modelImages.Load(modelImage, *curPol, currentChannelIndex, *isImaginary);
+					ModelRenderer renderer(_fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM());
 					if(_multiscale)
 					{
 						std::cout << "Rendering sources to restored image... " << std::flush;
@@ -722,7 +707,7 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 					else {
 						Model model;
 						// A model cannot hold instrumental pols (xx/xy/yx/yy), hence always use Stokes I here
-						CleanAlgorithm::GetModelFromImage(model, modelImage, _imgWidth, _imgHeight, _fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, 0.0, _fitsWriter.Frequency(), Polarization::StokesI);
+						CleanAlgorithm::GetModelFromImage(model, modelImage, _imgWidth, _imgHeight, _fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM(), 0.0, _fitsWriter.Frequency(), Polarization::StokesI);
 						
 						std::cout << "Rendering " << model.SourceCount() << " sources to restored image... " << std::flush;
 						renderer.Restore(restoredImage, _imgWidth, _imgHeight, model, _fitsWriter.BeamSizeMajorAxis(), freqLow, freqHigh, Polarization::StokesI);
@@ -771,6 +756,9 @@ void WSClean::predictChannel(size_t outChannelIndex)
 			if(reader.ImageWidth()!=_imgWidth || reader.ImageHeight()!=_imgHeight)
 				throw std::runtime_error("Inconsistent image size: input image did not match with specified dimensions.");
 			reader.Read(buffer);
+			for(size_t i=0; i!=_imgWidth*_imgHeight; ++i)
+				if(!std::isfinite(buffer[i]))
+					throw std::runtime_error("The input image contains non-finite values -- can't predict from an image with non-finite values");
 			_modelImages.Store(buffer, *curPol, 0, false);
 			if(*curPol == Polarization::XY)
 			{
@@ -851,6 +839,7 @@ void WSClean::runFirstInversion(size_t currentChannelIndex, PolarizationEnum pol
 	
 	_isFirstInversion = false;
 	
+	// Set model to zero: already done if this is YX of XY/YX imaging combi
 	if(!(polarization == Polarization::YX && _polarizations.count(Polarization::XY)!=0))
 	{
 		double* modelImage = _imageAllocator.Allocate(_imgWidth * _imgHeight);
@@ -861,11 +850,24 @@ void WSClean::runFirstInversion(size_t currentChannelIndex, PolarizationEnum pol
 		_imageAllocator.Free(modelImage);
 	}
 	
-	std::cout << "Writing dirty image... " << std::flush;
-	writeFits("dirty.fits", _inversionAlgorithm->ImageRealResult(), polarization, currentChannelIndex, false);
-	if(Polarization::IsComplex(polarization))
-		writeFits("dirty.fits", _inversionAlgorithm->ImageImaginaryResult(), polarization, currentChannelIndex, true);
-	std::cout << "DONE\n";
+	if(polarization == Polarization::XY && _polarizations.count(Polarization::YX)!=0)
+	{ // Skip saving XY of XY/YX combi
+	}
+	else {
+		PolarizationEnum savedPol = polarization;
+		if(savedPol == Polarization::YX && _polarizations.count(Polarization::XY)!=0)
+			savedPol = Polarization::XY;
+		double* dirtyImage = _imageAllocator.Allocate(_imgWidth * _imgHeight);
+		_residualImages.Load(dirtyImage, savedPol, joinedChannelIndex, false);
+		std::cout << "Writing dirty image...\n";
+		writeFits("dirty.fits", dirtyImage, savedPol, currentChannelIndex, false);
+		if(Polarization::IsComplex(polarization))
+		{
+			_residualImages.Load(dirtyImage, savedPol, joinedChannelIndex, true);
+			writeFits("dirty.fits", dirtyImage, savedPol, currentChannelIndex, true);
+		}
+		_imageAllocator.Free(dirtyImage);
+	}
 	
 	clearCurMSProviders();
 }
@@ -931,16 +933,12 @@ void WSClean::performSimpleClean(CleanAlgorithm& cleanAlgorithm, size_t currentC
 	
 	if(majorIterationNr == 1)
 	{
-		if(_mGain == 1.0)
+		if(_mGain != 1.0)
 		{
-			std::cout << "Writing residual image... " << std::flush;
-			writeFits("residual.fits", residualImage.Data(), polarization, currentChannelIndex, false);
-		}
-		else {
 			std::cout << "Writing first iteration image... " << std::flush;
 			writeFits("first-residual.fits", residualImage.Data(), polarization, currentChannelIndex, false);
+			std::cout << "DONE\n";
 		}
-		std::cout << "DONE\n";
 	}
 	if(!reachedMajorThreshold)
 	{
@@ -1004,16 +1002,12 @@ void WSClean::performJoinedPolClean(size_t currentChannelIndex, bool& reachedMaj
 		
 		if(majorIterationNr == 1)
 		{
-			if(_mGain == 1.0)
+			if(_mGain != 1.0)
 			{
-				std::cout << "Writing residual image... " << std::flush;
-				writeFits("residual.fits", residualSet.GetImage(i), polarization, currentChannelIndex, isImaginary);
-			}
-			else {
 				std::cout << "Writing first iteration image... " << std::flush;
 				writeFits("first-residual.fits", residualSet.GetImage(i), polarization, currentChannelIndex, isImaginary);
+				std::cout << "DONE\n";
 			}
-			std::cout << "DONE\n";
 		}
 		if(!reachedMajorThreshold)
 		{
@@ -1085,16 +1079,12 @@ void WSClean::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majo
 			
 			if(majorIterationNr == 1)
 			{
-				if(_mGain == 1.0)
+				if(_mGain != 1.0)
 				{
-					std::cout << "Writing residual image... " << std::flush;
-					writeFits("residual.fits", residualSet.GetImage(i,ch), polarization, ch, isImaginary);
-				}
-				else {
 					std::cout << "Writing first iteration image... " << std::flush;
 					writeFits("first-residual.fits", residualSet.GetImage(i,ch), polarization, ch, isImaginary);
+					std::cout << "DONE\n";
 				}
-				std::cout << "DONE\n";
 			}
 			if(!reachedMajorThreshold)
 			{

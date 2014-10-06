@@ -54,6 +54,14 @@ class Measurement
 			}
 		}
 		
+		void AverageWidth(const Measurement &rhs)
+		{
+			for(size_t p=0; p!=4; ++p)
+			{
+				_fluxDensities[p] = (_fluxDensities[p] + rhs._fluxDensities[p]) * 0.5;
+			}
+		}
+		
 		long double FrequencyHz() const { return _frequencyHz; }
 		
 		void SetFrequencyHz(long double frequencyHz) { _frequencyHz = frequencyHz; }
@@ -134,6 +142,8 @@ class SpectralEnergyDistribution
 		//typedef boost::select_second_const_range<FluxMap>::const_iterator const_iterator;
 		typedef FluxMap::iterator iterator;
 		typedef FluxMap::const_iterator const_iterator;
+		typedef FluxMap::reverse_iterator reverse_iterator;
+		typedef FluxMap::const_reverse_iterator const_reverse_iterator;
 		
 		SpectralEnergyDistribution()
 		{ }
@@ -204,6 +214,24 @@ class SpectralEnergyDistribution
 					throw std::runtime_error("Combining measurements for new frequencies, but frequencies overlap");
 				const Measurement& m = i->second;
 				AddMeasurement(m);
+			}
+		}
+		
+		void CombineMeasurementsWithAveraging(const SpectralEnergyDistribution& other)
+		{
+			for(const_iterator i=other.begin(); i!=other.end(); ++i)
+			{
+				double freq = i->first;
+				FluxMap::iterator pos = _measurements.find(freq);
+				if(pos == end())
+				{
+					const Measurement& m = i->second;
+					AddMeasurement(m);
+				}
+				else {
+					Measurement& m = pos->second;
+					m.AverageWidth(i->second);
+				}
 			}
 		}
 		
@@ -474,6 +502,56 @@ class SpectralEnergyDistribution
 			}
 		}
 		
+		long double AverageFlux(PolarizationEnum polarization) const
+		{
+			long double sum = 0.0;
+			size_t count = 0;
+			for(FluxMap::const_iterator i=_measurements.begin(); i!=_measurements.end(); ++i)
+			{
+				const Measurement &m = i->second;
+				long double flux = m.FluxDensity(polarization);
+				if(std::isfinite(flux))
+				{
+					++count;
+					sum += flux;
+				}
+			}
+			return sum / (long double) count;
+		}
+		
+		long double AverageFlux(long double startFrequency, long double endFrequency, PolarizationEnum polarization) const
+		{
+			if(startFrequency == endFrequency)
+				return FluxAtFrequency(startFrequency, polarization);
+			
+			/** Handle special cases */
+			if(_measurements.empty())
+				return 0.0;
+			
+			FluxMap::const_iterator iter = _measurements.lower_bound(startFrequency);
+			if(iter == _measurements.end()) // all keys are lower
+				return std::numeric_limits<long double>::quiet_NaN();
+			
+			size_t count = 0;
+			long double fluxSum = 0.0;
+			
+			while(iter->first < endFrequency && iter != _measurements.end())
+			{
+				long double flux = iter->second.FluxDensity(polarization);
+				if(std::isfinite(flux))
+				{
+					++count;
+					fluxSum += flux;
+				}
+				++iter;
+			}
+			
+			if(count == 0)
+				return std::numeric_limits<long double>::quiet_NaN();
+			else
+				return fluxSum / count;
+		}
+		
 		void FitPowerlaw(long double& factor, long double& exponent, PolarizationEnum polarization) const
 		{
 			long double sumxy = 0.0, sumx = 0.0, sumy = 0.0, sumxx = 0.0;
@@ -515,10 +593,10 @@ class SpectralEnergyDistribution
 				}
 				double eTemp = 0.0, fTemp = 1.0;
 				fitter.Fit(eTemp, fTemp);
-				if(n == 0)
-					std::cout << "No valid data in power law fit\n";
-				else
-					std::cout << "Non-linear fit yielded: " << fTemp << " * x^" << eTemp << "\n";
+				//if(n == 0)
+				//	std::cout << "No valid data in power law fit\n";
+				//else
+				//	std::cout << "Non-linear fit yielded: " << fTemp << " * x^" << eTemp << "\n";
 				exponent = eTemp;
 				factor = fTemp;
 			}
@@ -538,7 +616,39 @@ class SpectralEnergyDistribution
 		long double FluxAtLowestFrequency() const
 		{
 			const Measurement &m = _measurements.begin()->second;
-			return m.FluxDensityFromIndex(0) * 0.5;
+			return m.FluxDensityFromIndex(0);
+		}
+		
+		bool HasValidMeasurement() const
+		{
+			for(FluxMap::const_iterator i=_measurements.begin(); i!=_measurements.end(); ++i)
+			{
+				if(std::isfinite(i->second.FluxDensity(Polarization::StokesI)) ||
+					std::isfinite(i->second.FluxDensity(Polarization::StokesQ)) ||
+					std::isfinite(i->second.FluxDensity(Polarization::StokesU)) ||
+					std::isfinite(i->second.FluxDensity(Polarization::StokesV)))
+					return true;
+			}
+			return false;
+		}
+		
+		void RemoveInvalidMeasurements()
+		{
+			FluxMap::iterator i=_measurements.begin();
+			while(i!=_measurements.end())
+			{
+				if(!std::isfinite(i->second.FluxDensity(Polarization::StokesI)) ||
+					!std::isfinite(i->second.FluxDensity(Polarization::StokesQ)) ||
+					!std::isfinite(i->second.FluxDensity(Polarization::StokesU)) ||
+					!std::isfinite(i->second.FluxDensity(Polarization::StokesV)))
+				{
+					_measurements.erase(i);
+					i = _measurements.begin();
+				}
+				else {
+					++i;
+				}
+			}
 		}
 		
 		bool operator<(const SpectralEnergyDistribution &other) const
@@ -553,6 +663,7 @@ class SpectralEnergyDistribution
 		size_t MeasurementCount() const { return _measurements.size(); }
 		long double LowestFrequency() const { return _measurements.begin()->first; }
 		long double HighestFrequency() const { return _measurements.rbegin()->first; }
+		long double CentreFrequency() const { return 0.5 * (LowestFrequency() + HighestFrequency()); }
 		
 		void GetMeasurements(std::vector<Measurement> &measurements) const
 		{
@@ -567,6 +678,11 @@ class SpectralEnergyDistribution
 		const_iterator begin() const { return _measurements.begin(); }
 		iterator end() { return _measurements.end(); }
 		const_iterator end() const { return _measurements.end(); }
+		
+		reverse_iterator rbegin() { return _measurements.rbegin(); }
+		const_reverse_iterator rbegin() const { return _measurements.rbegin(); }
+		reverse_iterator rend() { return _measurements.rend(); }
+		const_reverse_iterator rend() const { return _measurements.rend(); }
 	private:
 		FluxMap _measurements;
 };
