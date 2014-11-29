@@ -88,6 +88,51 @@ void rotateVisibilities(const BandData &bandData, double shiftFactor, unsigned p
 	}
 }
 
+casa::MPosition ArrayCentroid(MeasurementSet& set)
+{
+	casa::MSAntenna aTable = set.antenna();
+	if(aTable.nrow() == 0) throw std::runtime_error("No antennae in set");
+	casa::MPosition::ROScalarColumn antPosColumn(aTable, aTable.columnName(casa::MSAntennaEnums::POSITION));
+	double x = 0.0, y = 0.0, z = 0.0;
+	for(size_t row=0; row!=aTable.nrow(); ++row)
+	{
+		casa::MPosition antPos = antPosColumn(row);
+		casa::Vector<casa::Double> vec = antPos.getValue().getVector();
+		x += vec[0]; y += vec[1]; z += vec[2];
+	}
+	casa::MPosition arrayPos = antPosColumn(0);
+	double count = aTable.nrow();
+	arrayPos.set(casa::MVPosition(x/count, y/count, z/count), arrayPos.getRef());
+	return arrayPos;
+}
+
+MDirection ZenithDirection(MeasurementSet& set, size_t rowIndex)
+{
+	casa::MPosition arrayPos = ArrayCentroid(set);
+	casa::MEpoch::ROScalarColumn timeColumn(set, set.columnName(casa::MSMainEnums::TIME));
+	casa::MEpoch time = timeColumn(rowIndex);
+	casa::MeasFrame frame(arrayPos, time);
+	const casa::MDirection::Ref azelgeoRef(casa::MDirection::AZELGEO, frame);
+	const casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
+	casa::MDirection zenithAzEl(casa::MVDirection(0.0, 0.0, 1.0), azelgeoRef);
+	return casa::MDirection::Convert(zenithAzEl, j2000Ref)();
+}
+
+MDirection ZenithDirection(MeasurementSet& set)
+{
+	return ZenithDirection(set, set.nrow()/2);
+}
+
+MDirection ZenithDirectionStart(MeasurementSet& set)
+{
+	return ZenithDirection(set, 0);
+}
+
+MDirection ZenithDirectionEnd(MeasurementSet& set)
+{
+	return ZenithDirection(set, set.nrow()-1);
+}
+
 void processField(
 	MeasurementSet &set, int fieldIndex, MSField &fieldTable, const MDirection &newDirection,
 	bool onlyUVW, bool shiftback)
@@ -263,6 +308,150 @@ void processField(
 	}
 }
 
+void rotateToGeoZenith(
+	MeasurementSet &set, int fieldIndex, MSField &fieldTable, bool onlyUVW)
+{
+	MultiBandData bandData(set.spectralWindow(), set.dataDescription());
+	ROScalarColumn<casa::String> nameCol(fieldTable, fieldTable.columnName(MSFieldEnums::NAME));
+	MDirection::ArrayColumn phaseDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::PHASE_DIR));
+	MEpoch::ROScalarColumn timeCol(set, set.columnName(MSMainEnums::TIME));
+	MDirection::ArrayColumn delayDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::DELAY_DIR));
+	MDirection::ArrayColumn refDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::REFERENCE_DIR));
+	
+	ROScalarColumn<int>
+		antenna1Col(set, set.columnName(MSMainEnums::ANTENNA1)),
+		antenna2Col(set, set.columnName(MSMainEnums::ANTENNA2)),
+		fieldIdCol(set, set.columnName(MSMainEnums::FIELD_ID)),
+		dataDescIdCol(set, set.columnName(MSMainEnums::DATA_DESC_ID));
+	Muvw::ROScalarColumn
+		uvwCol(set, set.columnName(MSMainEnums::UVW));
+	ArrayColumn<double>
+		uvwOutCol(set, set.columnName(MSMainEnums::UVW));
+	
+	const bool
+		hasCorrData = set.isColumn(casa::MSMainEnums::CORRECTED_DATA),
+		hasModelData = set.isColumn(casa::MSMainEnums::MODEL_DATA);
+	std::auto_ptr<ArrayColumn<Complex> > dataCol, correctedDataCol, modelDataCol;
+	if(!onlyUVW)
+	{
+		dataCol.reset(new ArrayColumn<Complex>(set,
+			set.columnName(MSMainEnums::DATA)));
+		
+		if(hasCorrData)
+		{
+			correctedDataCol.reset(new ArrayColumn<Complex>(set,
+				set.columnName(MSMainEnums::CORRECTED_DATA)));
+		}
+		if(hasModelData)
+		{
+			modelDataCol.reset(new ArrayColumn<Complex>(set,
+				set.columnName(MSMainEnums::MODEL_DATA)));
+		}
+	}
+	
+	Vector<MDirection> phaseDirVector = phaseDirCol(fieldIndex);
+	MDirection phaseDirection = phaseDirVector[0];
+	double oldRA = phaseDirection.getAngle().getValue()[0];
+	double oldDec = phaseDirection.getAngle().getValue()[1];
+	
+	IPosition dataShape;
+	unsigned polarizationCount = 0;
+	std::auto_ptr<Array<Complex> > dataArray;
+	if(!onlyUVW)
+	{
+		dataShape = dataCol->shape(0);
+		polarizationCount = dataShape[0];
+		dataArray.reset(new Array<Complex>(dataShape));
+	}
+	
+	ProgressBar* progressBar = 0;
+	
+	std::vector<Muvw> uvws(antennas.size());
+	MEpoch time(MVEpoch(-1.0));
+	for(unsigned row=0; row!=set.nrow(); ++row)
+	{
+		if(fieldIdCol(row) == fieldIndex)
+		{
+			// Read values from set
+			const int
+				antenna1 = antenna1Col(row),
+				antenna2 = antenna2Col(row),
+				dataDescId = dataDescIdCol(row);
+			const Muvw oldUVW = uvwCol(row);
+			
+			MEpoch rowTime = timeCol(row);
+			if(rowTime.getValue() != time.getValue())
+			{
+				time = rowTime;
+				
+				MDirection newDirection = ZenithDirection(set, row);
+				double newRA = newDirection.getAngle().getValue()[0];
+				double newDec = newDirection.getAngle().getValue()[1];
+				std::cout << "Processing timestep in field \"" << nameCol(fieldIndex) << "\": "
+					<< dirToString(phaseDirection) << " -> "
+					<< dirToString(newDirection) << " ("
+					<< ImageCoordinates::AngularDistance(oldRA, oldDec, newRA, newDec)*(180.0/M_PI) << " deg)\n";
+				MDirection refDirection = MDirection::Convert(newDirection, MDirection::Ref(MDirection::J2000))();
+				double dl, dm;
+				ImageCoordinates::RaDecToLM(oldRA, oldDec, newRA, newDec, dl, dm);
+
+				for(size_t a=0; a!=antennas.size(); ++a)
+					uvws[a] = calculateUVW(antennas[a], antennas[0], time, refDirection);
+			}
+
+			// Calculate the new UVW
+			MVuvw newUVW = uvws[antenna1].getValue() - uvws[antenna2].getValue();
+			
+			// If one of the first results, output values for analyzing them.
+			if(row < 5)
+			{
+				std::cout << "Old " << oldUVW << " (" << length(oldUVW) << ")\n";
+				std::cout << "New " << newUVW << " (" << length(newUVW) << ")\n\n";
+			}
+			else {
+				if(progressBar == 0)
+					progressBar = new ProgressBar("Changing phase centre");
+				progressBar->SetProgress(row, set.nrow());
+			}
+			
+			// Read the visibilities and phase-rotate them
+			double shiftFactor =
+				-2.0*M_PI* (newUVW.getVector()[2] - oldUVW.getValue().getVector()[2]);
+
+			if(!onlyUVW)
+			{
+				const BandData& thisBand = bandData[dataDescId];
+				dataCol->get(row, *dataArray);
+				rotateVisibilities(thisBand, shiftFactor, polarizationCount, dataArray->cbegin());
+				dataCol->put(row, *dataArray);
+					
+				if(hasCorrData)
+				{
+					correctedDataCol->get(row, *dataArray);
+					rotateVisibilities(thisBand, shiftFactor, polarizationCount, dataArray->cbegin());
+					correctedDataCol->put(row, *dataArray);
+				}
+				
+				if(hasModelData)
+				{
+					modelDataCol->get(row, *dataArray);
+					rotateVisibilities(thisBand, shiftFactor, polarizationCount, dataArray->cbegin());
+					modelDataCol->put(row, *dataArray);
+				}
+			}
+			
+			// Store uvws
+			uvwOutCol.put(row, newUVW.getVector());
+		}
+	}
+	delete progressBar;
+	
+	phaseDirVector[0] = ZenithDirection(set);
+	phaseDirCol.put(fieldIndex, phaseDirVector);
+	delayDirCol.put(fieldIndex, phaseDirVector);
+	refDirCol.put(fieldIndex, phaseDirVector);
+}
+
 void readAntennas(MeasurementSet &set, std::vector<MPosition> &antennas)
 {
 	MSAntenna antennaTable = set.antenna();
@@ -273,60 +462,6 @@ void readAntennas(MeasurementSet &set, std::vector<MPosition> &antennas)
 	{
 		antennas[i] = MPosition::Convert(posCol(i), MPosition::ITRF)();
 	}
-}
-
-casa::MPosition ArrayCentroid(MeasurementSet& set)
-{
-	casa::MSAntenna aTable = set.antenna();
-	if(aTable.nrow() == 0) throw std::runtime_error("No antennae in set");
-	casa::MPosition::ROScalarColumn antPosColumn(aTable, aTable.columnName(casa::MSAntennaEnums::POSITION));
-	double x = 0.0, y = 0.0, z = 0.0;
-	for(size_t row=0; row!=aTable.nrow(); ++row)
-	{
-		casa::MPosition antPos = antPosColumn(row);
-		casa::Vector<casa::Double> vec = antPos.getValue().getVector();
-		x += vec[0]; y += vec[1]; z += vec[2];
-	}
-	casa::MPosition arrayPos = antPosColumn(0);
-	double count = aTable.nrow();
-	arrayPos.set(casa::MVPosition(x/count, y/count, z/count), arrayPos.getRef());
-	return arrayPos;
-}
-
-MDirection ZenithDirection(MeasurementSet& set)
-{
-	casa::MPosition arrayPos = ArrayCentroid(set);
-	casa::MEpoch::ROScalarColumn timeColumn(set, set.columnName(casa::MSMainEnums::TIME));
-	casa::MEpoch time = timeColumn(set.nrow()/2);
-	casa::MeasFrame frame(arrayPos, time);
-	const casa::MDirection::Ref azelgeoRef(casa::MDirection::AZELGEO, frame);
-	const casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
-	casa::MDirection zenithAzEl(casa::MVDirection(0.0, 0.0, 1.0), azelgeoRef);
-	return casa::MDirection::Convert(zenithAzEl, j2000Ref)();
-}
-
-MDirection ZenithDirectionStart(MeasurementSet& set)
-{
-	casa::MPosition arrayPos = ArrayCentroid(set);
-	casa::MEpoch::ROScalarColumn timeColumn(set, set.columnName(casa::MSMainEnums::TIME));
-	casa::MEpoch time = timeColumn(0);
-	casa::MeasFrame frame(arrayPos, time);
-	const casa::MDirection::Ref azelgeoRef(casa::MDirection::AZELGEO, frame);
-	const casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
-	casa::MDirection zenithAzEl(casa::MVDirection(0.0, 0.0, 1.0), azelgeoRef);
-	return casa::MDirection::Convert(zenithAzEl, j2000Ref)();
-}
-
-MDirection ZenithDirectionEnd(MeasurementSet& set)
-{
-	casa::MPosition arrayPos = ArrayCentroid(set);
-	casa::MEpoch::ROScalarColumn timeColumn(set, set.columnName(casa::MSMainEnums::TIME));
-	casa::MEpoch time = timeColumn(set.nrow()-1);
-	casa::MeasFrame frame(arrayPos, time);
-	const casa::MDirection::Ref azelgeoRef(casa::MDirection::AZELGEO, frame);
-	const casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
-	casa::MDirection zenithAzEl(casa::MVDirection(0.0, 0.0, 1.0), azelgeoRef);
-	return casa::MDirection::Convert(zenithAzEl, j2000Ref)();
 }
 
 MDirection MinWDirection(MeasurementSet& set)
@@ -393,7 +528,7 @@ void printPhaseDir(const std::string &filename)
 		std::cout << dirToString(phaseDirection) << '\n';
 	}
 	
-	std::cout << "Zenith is at:\n  " << dirToString(zenith) << " (" << dirToString(ZenithDirectionStart(set)) << " - " << dirToString(ZenithDirectionEnd(set)) << '\n';
+	std::cout << "Zenith is at:\n  " << dirToString(zenith) << " (" << dirToString(ZenithDirectionStart(set)) << " - " << dirToString(ZenithDirectionEnd(set)) << ")\n";
 	std::cout << "Min-w direction is at:\n  " << dirToString(MinWDirection(set)) << '\n';
 }
 
@@ -412,13 +547,17 @@ int main(int argc, char **argv)
 			"\tchgcentre myset.ms 09h18m05.8s -12d05m44s\n\n";
 	} else {
 		int argi=1;
-		bool toZenith = false, toMinW = false, onlyUVW = false, shiftback = false;
+		bool toZenith = false, toMinW = false, onlyUVW = false, shiftback = false, toGeozenith = false;
 		while(argv[argi][0] == '-')
 		{
 			std::string param(&argv[argi][1]);
 			if(param == "zenith")
 			{
 				toZenith = true;
+			}
+			if(param == "geozenith")
+			{
+				toGeozenith = true;
 			}
 			else if(param == "minw")
 			{
@@ -437,7 +576,7 @@ int main(int argc, char **argv)
 		}
 		if(argi == argc)
 			std::cout << "Missing parameter.\n";
-		else if(argi+1 == argc && !toZenith && !toMinW)
+		else if(argi+1 == argc && !toZenith && !toMinW && !toGeozenith)
 		{
 			printPhaseDir(argv[argi]);
 		}
@@ -452,7 +591,7 @@ int main(int argc, char **argv)
 			{
 				newDirection = MinWDirection(set);
 			}
-			else {
+			else if(!toGeozenith) {
 				double newRA = RaDecCoord::ParseRA(argv[argi+1]);
 				double newDec = RaDecCoord::ParseDec(argv[argi+2]);
 				newDirection = MDirection(MVDirection(newRA, newDec), MDirection::Ref(MDirection::J2000));
@@ -463,7 +602,10 @@ int main(int argc, char **argv)
 			MSField fieldTable = set.field();
 			for(unsigned fieldIndex=0; fieldIndex!=fieldTable.nrow(); ++fieldIndex)
 			{
-				processField(set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback);
+				if(toGeozenith)
+					rotateToGeoZenith(set, fieldIndex, fieldTable, onlyUVW);
+				else
+					processField(set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback);
 			}
 		}
 	}
