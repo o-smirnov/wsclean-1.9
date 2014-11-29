@@ -62,6 +62,14 @@ class Measurement
 			}
 		}
 		
+		void AverageWidth(const Measurement &rhs, double weight)
+		{
+			for(size_t p=0; p!=4; ++p)
+			{
+				_fluxDensities[p] = (_fluxDensities[p] * (1.0 - weight) + rhs._fluxDensities[p] * weight);
+			}
+		}
+		
 		long double FrequencyHz() const { return _frequencyHz; }
 		
 		void SetFrequencyHz(long double frequencyHz) { _frequencyHz = frequencyHz; }
@@ -217,7 +225,7 @@ class SpectralEnergyDistribution
 			}
 		}
 		
-		void CombineMeasurementsWithAveraging(const SpectralEnergyDistribution& other)
+		void CombineMeasurementsWithAveraging(const SpectralEnergyDistribution& other, double weight = 0.5)
 		{
 			for(const_iterator i=other.begin(); i!=other.end(); ++i)
 			{
@@ -230,7 +238,7 @@ class SpectralEnergyDistribution
 				}
 				else {
 					Measurement& m = pos->second;
-					m.AverageWidth(i->second);
+					m.AverageWidth(i->second, weight);
 				}
 			}
 		}
@@ -611,6 +619,44 @@ class SpectralEnergyDistribution
 					factor = std::exp((sumy - exponent * sumx) / n);
 				}
 			}
+		}
+		
+		void FitPowerlaw2ndOrder(long double& a, long double& b, long double& c, PolarizationEnum polarization) const
+		{
+			NonLinearPowerLawFitter fitter;
+			size_t n = 0;
+			for(FluxMap::const_iterator i=_measurements.begin(); i!=_measurements.end(); ++i)
+			{
+				const Measurement &m = i->second;
+				long double flux = m.FluxDensity(polarization);
+				if(std::isfinite(m.FrequencyHz()) && std::isfinite(flux)) {
+					fitter.AddDataPoint(m.FrequencyHz(), flux);
+					++n;
+				}
+			}
+			double aTemp = 0.0, bTemp = 1.0, cTemp = 0.0;
+			fitter.Fit(aTemp, bTemp, cTemp);
+			a = aTemp;
+			b = bTemp;
+			c = cTemp;
+		}
+		
+		
+		void FitLogPolynomial(std::vector<double>& terms, size_t nTerms, PolarizationEnum polarization) const
+		{
+			NonLinearPowerLawFitter fitter;
+			size_t n = 0;
+			for(FluxMap::const_iterator i=_measurements.begin(); i!=_measurements.end(); ++i)
+			{
+				const Measurement &m = i->second;
+				long double flux = m.FluxDensity(polarization);
+				if(std::isfinite(m.FrequencyHz()) && std::isfinite(flux)) {
+					fitter.AddDataPoint(m.FrequencyHz(), flux);
+					++n;
+				}
+			}
+			terms.assign(nTerms, 0.0);
+			fitter.Fit(terms, nTerms);
 		}
 		
 		long double FluxAtLowestFrequency() const
