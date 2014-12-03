@@ -2,12 +2,20 @@
 #define MATRIX_2X2_H
 
 #include <complex>
+#include <limits>
 
 class Matrix2x2
 {
 public:
 	template<typename LHS_T, typename RHS_T>
 	static void Assign(std::complex<LHS_T>* dest, const std::complex<RHS_T>* source)
+	{
+		for(size_t p=0; p!=4; ++p)
+			dest[p] = source[p];
+	}
+	
+	template<typename LHS_T, typename RHS_T>
+	static void Assign(LHS_T* dest, const RHS_T* source)
 	{
 		for(size_t p=0; p!=4; ++p)
 			dest[p] = source[p];
@@ -176,6 +184,71 @@ public:
 
 		e1 = sqrt((-b + sqrtd) * 0.5);
 		e2 = sqrt((-b - sqrtd) * 0.5);
+	}
+	
+	static void EigenValues(const double* matrix, double &e1, double &e2)
+	{
+		double tr = matrix[0] + matrix[3];
+		double d = matrix[0]*matrix[3] - matrix[1]*matrix[2];
+		double term = sqrt(tr*tr*0.25-d);
+		double trHalf = tr*0.5;
+		e1 = trHalf + term;
+		e2 = trHalf - term;
+	}
+	
+	static void EigenValuesAndVectors(const double* matrix, double &e1, double &e2, double* vec1, double* vec2)
+	{
+		double tr = matrix[0] + matrix[3];
+		double d = matrix[0]*matrix[3] - matrix[1]*matrix[2];
+		double term = sqrt(tr*tr*0.25-d);
+		double trHalf = tr*0.5;
+		e1 = trHalf + term;
+		e2 = trHalf - term;
+		if(matrix[2] != 0.0)
+		{
+			vec1[0] = e1 - matrix[3];
+			vec1[1] = matrix[2];
+			vec2[0] = e2 - matrix[3];
+			vec2[1] = matrix[2];
+		}
+		else if(matrix[1] != 0.0)
+		{
+			vec1[0] = matrix[1];
+			vec1[1] = e1 - matrix[0];
+			vec2[0] = matrix[1];
+			vec2[1] = e2 - matrix[0];
+		}
+		else {
+			vec1[0] = 1.0;
+			vec1[1] = 0.0;
+			vec2[0] = 0.0;
+			vec2[1] = 1.0;
+		}
+	}
+	
+	static void SquareRoot(double* matrix)
+	{
+		double tr = matrix[0] + matrix[3];
+		double d = matrix[0]*matrix[3] - matrix[1]*matrix[2];
+		double s = /*+/-*/ sqrt(d);
+		double t = /*+/-*/ sqrt(tr + 2.0*s);
+		if(t != 0.0)
+		{
+			matrix[0] = (matrix[0]+s ) / t;
+			matrix[1] = (matrix[1] / t);
+			matrix[2] = (matrix[2] / t);
+			matrix[3] = (matrix[3]+s) / t;
+		}
+		else {
+			if(matrix[0] == 0.0 && matrix[1] == 0.0 &&
+				matrix[2] == 0.0 && matrix[3] == 0.0)
+			{
+				// done: it's the zero matrix
+			} else {
+				for(size_t i=0; i!=4; ++i)
+					matrix[i] = std::numeric_limits<double>::quiet_NaN();
+			}
+		}
 	}
 	
 	template<typename T>
