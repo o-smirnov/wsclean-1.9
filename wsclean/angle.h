@@ -2,6 +2,7 @@
 #define ANGLE_H
 
 #include <string>
+#include <sstream>
 #include <stdexcept>
 #include <cmath>
 
@@ -10,11 +11,14 @@
 class Angle
 {
 public:
+	enum Unit { Radians, Degrees, Arcminutes, Arcseconds, Milliarcseconds };
 	/**
 	 * Parse the string as an angle, possibly with unit specification, and return in radians.
 	 * @return The angle
 	 */
-	static double Parse(const std::string& s, const std::string& valueDescription);
+	static double Parse(const std::string& s, const std::string& valueDescription, Unit defaultUnit);
+	
+	static std::string ToNiceString(double angleRad);
 	
 private:
 	static size_t findNumberEnd(const std::string& s);
@@ -22,7 +26,35 @@ private:
 	static bool isWhitespace(const char c) { return c==' ' || c=='\t'; }
 };
 
-inline double Angle::Parse(const std::string& s, const std::string& valueDescription)
+inline std::string Angle::ToNiceString(double angleRad)
+{
+	std::ostringstream str;
+	double degAngle = angleRad * 180.0 / M_PI;
+	if(degAngle >= 2.0)
+	{
+		str << round(degAngle*100.0)/100.0 << " deg";
+	}
+	else {
+		double minAngle = angleRad * 180.0 * 60.0 / M_PI;
+		if(minAngle >= 2.0)
+		{
+			str << round(minAngle*100.0)/100.0 << "'";
+		}
+		else {
+			double secAngle = angleRad * 180.0 * 60.0 * 60.0 / M_PI;
+			if(secAngle >= 1.0)
+			{
+				str << round(secAngle*100.0)/100.0 << "''";
+			}
+			else {
+				str << round (secAngle*100.0*1000.0)/100.0 << " masec";
+			}
+		}
+	}
+	return str.str();
+}
+
+inline double Angle::Parse(const std::string& s, const std::string& valueDescription, Unit defaultUnit)
 {
   size_t end = findNumberEnd(s);
 	if(end == 0)
@@ -36,8 +68,26 @@ inline double Angle::Parse(const std::string& s, const std::string& valueDescrip
 	std::string unitStr = std::string(&c[end]);
 	boost::to_lower(unitStr);
 
-	// In degrees? (default)
-	if(unitStr.empty() || unitStr=="deg" || unitStr=="degrees")
+	// Unit string empty? Than use default unit.
+	if(unitStr.empty())
+	{
+		switch(defaultUnit)
+		{
+			case Radians:
+				return val;
+			case Degrees:
+				return val * M_PI/180.0;
+			case Arcminutes:
+				return val * M_PI/(180.0*60.0);
+			case Arcseconds:
+				return val * M_PI/(180.0*60.0*60.0);
+			case Milliarcseconds:
+				return val * M_PI/(180.0*60.0*60.0*1000.0);
+		}
+	}
+	
+	// In degrees?
+	else if(unitStr=="deg" || unitStr=="degrees")
 		return val * M_PI/180.0;
 	
 	// In arcmin?
@@ -52,8 +102,7 @@ inline double Angle::Parse(const std::string& s, const std::string& valueDescrip
 	else if(unitStr.empty() || unitStr=="rad" || unitStr=="radians")
 		return val * M_PI/(180.0*60.0*60.0);
 	
-	else
-		throw std::runtime_error("Invalid unit specification in angle given for " + valueDescription);
+	throw std::runtime_error("Invalid unit specification in angle given for " + valueDescription);
 }
 
 inline size_t Angle::findNumberEnd(const std::string& s)

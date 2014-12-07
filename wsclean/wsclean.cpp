@@ -20,6 +20,7 @@
 
 #include "uvector.h"
 #include "gaussianfitter.h"
+#include "angle.h"
 
 #include <iostream>
 #include <memory>
@@ -32,7 +33,8 @@ WSClean::WSClean() :
 	_threshold(0.0), _gain(0.1), _mGain(1.0), _cleanBorderRatio(0.05),
 	_manualBeamMajorSize(0.0), _manualBeamMinorSize(0.0),
 	_manualBeamPA(0.0), _fittedBeam(false), _circularBeam(false),
-	_memFraction(1.0), _absMemLimit(0.0), _wLimit(0.0),
+	_memFraction(1.0), _absMemLimit(0.0),
+	_minUVInLambda(0.0), _maxUVInLambda(0.0), _wLimit(0.0),
 	_multiscaleThresholdBias(0.7), _multiscaleScaleBias(0.6),
 	_nWLayers(0), _nIter(0), _antialiasingKernelSize(7), _overSamplingFactor(63),
 	_threadCount(sysconf(_SC_NPROCESSORS_ONLN)),
@@ -148,18 +150,22 @@ void WSClean::imagePSF(size_t currentChannelIndex, size_t joinedChannelIndex)
 			_imgWidth, _imgHeight,
 			_inversionAlgorithm->BeamSize()*2.0/(_pixelScaleX+_pixelScaleY),
 			bMaj, bMin, bPA);
-		std::cout << "major=" << bMaj*(180.0*60.0/M_PI)*0.5*(_pixelScaleX+_pixelScaleY) << "', minor=" <<
-		bMin*(180.0*60.0/M_PI)*0.5*(_pixelScaleX+_pixelScaleY) << "', PA=" << round(bPA*(180.0/M_PI)) << " deg, theoretical=" <<
-		_inversionAlgorithm->BeamSize()*(180.0*60.0/M_PI)<< "'.\n";
+		if(bMaj < 1.0) bMaj = 1.0;
+		if(bMin < 1.0) bMin = 1.0;
+		bMaj = bMaj*0.5*(_pixelScaleX+_pixelScaleY);
+		bMin = bMin*0.5*(_pixelScaleX+_pixelScaleY);
+		std::cout << "major=" << Angle::ToNiceString(bMaj) << ", minor=" <<
+		Angle::ToNiceString(bMin) << ", PA=" << Angle::ToNiceString(bPA) << ", theoretical=" <<
+		Angle::ToNiceString(_inversionAlgorithm->BeamSize())<< ".\n";
 		
-		_manualBeamMajorSize = bMaj*0.5*(_pixelScaleX+_pixelScaleY);
+		_manualBeamMajorSize = bMaj;
 		if(_circularBeam)
 		{
 			_manualBeamMinorSize = _manualBeamMajorSize;
 			_manualBeamPA = 0.0;
 		}
 		else {
-			_manualBeamMinorSize = bMin*0.5*(_pixelScaleX+_pixelScaleY);
+			_manualBeamMinorSize = bMin;
 			_manualBeamPA = bPA;
 		}
 		initFitsWriter(_fitsWriter);
@@ -283,55 +289,58 @@ void WSClean::predict(PolarizationEnum polarization, size_t joinedChannelIndex)
 
 void WSClean::initializeImageWeights(const MSSelection& partSelection)
 {
-	if(_weightMode.RequiresGridding())
+	if(_mfsWeighting)
 	{
-		if(_mfsWeighting)
-		{
-			std::cout << "Reusing MFS weights for " << _weightMode.ToString() << " weighting.\n";
-			_inversionAlgorithm->SetPrecalculatedWeightInfo(_imageWeights.get());
-		}
-		else {
-			std::cout << "Precalculating weights for " << _weightMode.ToString() << " weighting... " << std::flush;
-			_imageWeights.reset(new ImageWeights(_weightMode, _imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
-			for(size_t i=0; i!=_inversionAlgorithm->MeasurementSetCount(); ++i)
-			{
-				_imageWeights->Grid(_inversionAlgorithm->MeasurementSet(i), partSelection);
-				if(_inversionAlgorithm->MeasurementSetCount() > 1)
-					std::cout << i << ' ' << std::flush;
-			}
-			_imageWeights->FinishGridding();
-			_inversionAlgorithm->SetPrecalculatedWeightInfo(_imageWeights.get());
-			std::cout << "DONE\n";
-		}
+		std::cout << "Reusing MFS weights for " << _weightMode.ToString() << " weighting.\n";
 	}
+	else {
+		std::cout << "Precalculating weights for " << _weightMode.ToString() << " weighting... " << std::flush;
+		_imageWeights.reset(new ImageWeights(_weightMode, _imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
+		for(size_t i=0; i!=_inversionAlgorithm->MeasurementSetCount(); ++i)
+		{
+			_imageWeights->Grid(_inversionAlgorithm->MeasurementSet(i), partSelection);
+			if(_inversionAlgorithm->MeasurementSetCount() > 1)
+				std::cout << i << ' ' << std::flush;
+		}
+		_imageWeights->FinishGridding();
+		initializeWeightTapers();
+		std::cout << "DONE\n";
+	}
+	_inversionAlgorithm->SetPrecalculatedWeightInfo(_imageWeights.get());
+}
+
+void WSClean::initializeWeightTapers()
+{
+	if(_minUVInLambda!=0.0)
+		_imageWeights->SetMinUVRange(_minUVInLambda);
+	if(_maxUVInLambda!=0.0)
+		_imageWeights->SetMaxUVRange(_maxUVInLambda);
 }
 
 void WSClean::initializeMFSImageWeights()
 {
-	if(_weightMode.RequiresGridding())
+	std::cout << "Precalculating MFS weights for " << _weightMode.ToString() << " weighting...\n";
+	_imageWeights.reset(new ImageWeights(_weightMode, _imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
+	for(size_t i=0; i!=_filenames.size(); ++i)
 	{
-		std::cout << "Precalculating MFS weights for " << _weightMode.ToString() << " weighting...\n";
-		_imageWeights.reset(new ImageWeights(_weightMode, _imgWidth, _imgHeight, _pixelScaleX, _pixelScaleY, _weightMode.SuperWeight()));
-		for(size_t i=0; i!=_filenames.size(); ++i)
+		if(_doReorder)
 		{
-			if(_doReorder)
+			for(size_t ch=0; ch!=_channelsOut; ++ch)
 			{
-				for(size_t ch=0; ch!=_channelsOut; ++ch)
-				{
-					MSSelection partSelection(_globalSelection);
-					selectChannels(partSelection, ch, _channelsOut);
-					PartitionedMS msProvider(_partitionedMSHandles[i], ch, *_polarizations.begin());
-					_imageWeights->Grid(msProvider, partSelection);
-				}
-			}
-			else {
-				ContiguousMS msProvider(_filenames[i], _columnName, _globalSelection, *_polarizations.begin(), _mGain != 1.0);
-				_imageWeights->Grid(msProvider,  _globalSelection);
-				std::cout << '.' << std::flush;
+				MSSelection partSelection(_globalSelection);
+				selectChannels(partSelection, ch, _channelsOut);
+				PartitionedMS msProvider(_partitionedMSHandles[i], ch, *_polarizations.begin());
+				_imageWeights->Grid(msProvider, partSelection);
 			}
 		}
-		_imageWeights->FinishGridding();
+		else {
+			ContiguousMS msProvider(_filenames[i], _columnName, _globalSelection, *_polarizations.begin(), _mGain != 1.0);
+			_imageWeights->Grid(msProvider,  _globalSelection);
+			std::cout << '.' << std::flush;
+		}
 	}
+	_imageWeights->FinishGridding();
+	initializeWeightTapers();
 }
 
 void WSClean::freeCleanAlgorithms()
@@ -685,6 +694,7 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 		std::cout << _majorIterationNr << " major iterations were performed.\n";
 	}
 	
+	_inversionAlgorithm->FreeImagingData();
 	
 	// Restore model to residuals and save all images
 	for(size_t ch=0; ch!=joinedChannelsOut; ++ch)
