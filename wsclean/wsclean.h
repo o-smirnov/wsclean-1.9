@@ -73,6 +73,7 @@ public:
 	void SetAntialiasingKernelSize(size_t kernelSize) { _antialiasingKernelSize = kernelSize; }
 	void SetOversamplingFactor(size_t oversampling) { _overSamplingFactor = oversampling; }
 	void SetThreadCount(size_t threadCount) { _threadCount = threadCount; }
+	void SetTemporaryDirectory(const std::string& tempDir) { _temporaryDirectory = tempDir; }
 	void SetForceReorder(bool forceReorder) { _forceReorder = forceReorder; }
 	void SetForceNoReorder(bool forceNoReorder) { _forceNoReorder = forceNoReorder; }
 	void SetMemFraction(double memFraction) { _memFraction = memFraction; }
@@ -83,6 +84,7 @@ public:
 	void SetMaxUVInLambda(double lambda) { _maxUVInLambda = lambda; }
 	void SetWLimit(double wLimit) { _wLimit = wLimit; }
 	void SetCommandLine(const std::string& cmdLine) { _commandLine = cmdLine; }
+	void SetSaveGriddingImage(bool isGriddingImageSaved) { _isGriddingImageSaved = isGriddingImageSaved; }
 	
 	void AddInputMS(const std::string& msPath) { _filenames.push_back(msPath); }
 	
@@ -108,6 +110,8 @@ private:
 	void performReordering(bool isPredictMode);
 	
 	void initFitsWriter(class FitsWriter& writer);
+	void copyWSCleanKeywords(FitsReader& reader, FitsWriter& writer);
+	void copyDoubleKeywordIfExists(FitsReader& reader, FitsWriter& writer, const char* keywordName);
 	void setCleanParameters(class FitsWriter& writer, const class CleanAlgorithm& clean);
 	void updateCleanParameters(class FitsWriter& writer, size_t minorIterationNr, size_t majorIterationNr);
 	void initializeWeightTapers();
@@ -196,7 +200,8 @@ private:
 	std::set<PolarizationEnum> _polarizations;
 	WeightMode _weightMode;
 	std::string _prefixName;
-	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _makePSF;
+	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _makePSF, _isGriddingImageSaved;
+	std::string _temporaryDirectory;
 	bool _forceReorder, _forceNoReorder, _joinedPolarizationCleaning, _joinedFrequencyCleaning, _mfsWeighting, _multiscale;
 	enum LayeredImager::GridModeEnum _gridMode;
 	std::vector<std::string> _filenames;

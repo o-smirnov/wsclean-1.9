@@ -43,7 +43,8 @@ WSClean::WSClean() :
 	_polarizations(),
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
-	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false), _makePSF(false),
+	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false), _makePSF(false), _isGriddingImageSaved(false),
+	_temporaryDirectory(),
 	_forceReorder(false), _forceNoReorder(false), _joinedPolarizationCleaning(false), _joinedFrequencyCleaning(false),
 	_mfsWeighting(false), _multiscale(false),
 	_gridMode(LayeredImager::KaiserBessel),
@@ -106,6 +107,23 @@ void WSClean::initFitsWriter(FitsWriter& writer)
 		writer.SetExtraKeyword("WSCTIMEE", _inversionAlgorithm->Selection().IntervalEnd());
 	}
 	writer.SetExtraKeyword("WSCFIELD", _inversionAlgorithm->Selection().FieldId());
+}
+
+void WSClean::copyWSCleanKeywords(FitsReader& reader, FitsWriter& writer)
+{
+	const size_t
+		N_STRKEYWORDS=2, N_DBLKEYWORDS=17;
+	const char* strKeywords[N_STRKEYWORDS] =
+		{ "WSCDATAC", "WSCWEIGH" };
+	const char* dblKeywords[N_DBLKEYWORDS] =
+		{ "WSCIMGWG", "WSCNWLAY", "WSCGKRNL", "WSCCHANS", "WSCCHANE", "WSCTIMES", "WSCTIMEE", "WSCFIELD",
+			"WSCNITER", "WSCTHRES", "WSCGAIN", "WSCMGAIN", "WSCNEGCM", "WSCNEGST", "WSCSMPSF",
+			"WSCMINOR", "WSCMAJOR"
+		};
+	for(size_t i=0; i!=N_STRKEYWORDS; ++i)
+		writer.CopyStringKeywordIfExists(reader, strKeywords[i]);
+	for(size_t i=0; i!=N_DBLKEYWORDS; ++i)
+		writer.CopyDoubleKeywordIfExists(reader, dblKeywords[i]);
 }
 
 void WSClean::setCleanParameters(FitsWriter& writer, const CleanAlgorithm& clean)
@@ -357,11 +375,11 @@ void WSClean::initializeCleanAlgorithm()
 	double beamSize = _inversionAlgorithm->BeamSize();
 	if(_joinedPolarizationCleaning)
 	{
-		bool fourPol;
+		size_t polCount;
 		if(Polarization::HasFullPolarization(_polarizations))
-			fourPol = true;
+			polCount = 4;
 		else if(Polarization::HasDualLinearPolarization(_polarizations))
-			fourPol = false;
+			polCount = 2;
 		else
 			throw std::runtime_error("Joined polarization cleaning was requested, but can't find a compatible set of 2 or 4 pols to clean");
 			
@@ -370,7 +388,7 @@ void WSClean::initializeCleanAlgorithm()
 		{
 			if(_multiscale)
 			{
-				if(fourPol)
+				if(polCount == 4)
 				{
 					_cleanAlgorithms[0] =
 					new MultiScaleClean
@@ -384,7 +402,7 @@ void WSClean::initializeCleanAlgorithm()
 				}
 			}
 			else {
-				if(fourPol)
+				if(polCount == 4)
 					_cleanAlgorithms[0] = new JoinedClean<clean_algorithms::MultiImageSet<clean_algorithms::PolarizedImageSet<4>>>();
 				else
 					_cleanAlgorithms[0] = new JoinedClean<clean_algorithms::MultiImageSet<clean_algorithms::PolarizedImageSet<2>>>();
@@ -393,14 +411,14 @@ void WSClean::initializeCleanAlgorithm()
 		else {
 			if(_multiscale)
 			{
-				if(fourPol)
+				if(polCount == 4)
 					_cleanAlgorithms[0] = new MultiScaleClean<clean_algorithms::PolarizedImageSet<4>>(beamSize, _pixelScaleX, _pixelScaleY);
 				else
 					_cleanAlgorithms[0] = new MultiScaleClean<clean_algorithms::PolarizedImageSet<2>>(beamSize, _pixelScaleX, _pixelScaleY);
 			}
 			else
 			{
-				if(fourPol)
+				if(polCount == 4)
 					_cleanAlgorithms[0] = new JoinedClean<clean_algorithms::PolarizedImageSet<4>>();
 				else
 					_cleanAlgorithms[0] = new JoinedClean<clean_algorithms::PolarizedImageSet<2>>();
@@ -412,10 +430,19 @@ void WSClean::initializeCleanAlgorithm()
 		_cleanAlgorithms.resize(_polarizations.size());
 		for(size_t p=0; p!=_polarizations.size(); ++p)
 		{
-			if(_multiscale)
-				_cleanAlgorithms[p] = new MultiScaleClean<clean_algorithms::SingleImageSet>(beamSize, _pixelScaleX, _pixelScaleY);
-			else
-				_cleanAlgorithms[p] = new SimpleClean();
+			if(_joinedFrequencyCleaning)
+			{
+				if(_multiscale)
+					_cleanAlgorithms[p] = new MultiScaleClean<clean_algorithms::MultiImageSet<clean_algorithms::SingleImageSet>>(beamSize, _pixelScaleX, _pixelScaleY);
+				else
+					_cleanAlgorithms[p] = new JoinedClean<clean_algorithms::MultiImageSet<clean_algorithms::SingleImageSet>>();
+			}
+			else {
+				if(_multiscale)
+					_cleanAlgorithms[p] = new MultiScaleClean<clean_algorithms::SingleImageSet>(beamSize, _pixelScaleX, _pixelScaleY);
+				else
+					_cleanAlgorithms[p] = new SimpleClean();
+			}
 		}
 		count = _polarizations.size();
 	}
@@ -493,7 +520,7 @@ void WSClean::performReordering(bool isPredictMode)
 {
 	for(std::vector<std::string>::const_iterator i=_filenames.begin(); i != _filenames.end(); ++i)
 	{
-		_partitionedMSHandles.push_back(PartitionedMS::Partition(*i, _channelsOut, _globalSelection, _columnName, true, _mGain != 1.0 || isPredictMode, _polarizations));
+		_partitionedMSHandles.push_back(PartitionedMS::Partition(*i, _channelsOut, _globalSelection, _columnName, true, _mGain != 1.0 || isPredictMode, _polarizations, _temporaryDirectory));
 	}
 }
 
@@ -877,7 +904,7 @@ void WSClean::runFirstInversion(size_t currentChannelIndex, PolarizationEnum pol
 	
 	_weightPerChannel[currentChannelIndex] = _inversionAlgorithm->ImageWeight();
 	
-	if(firstBeforePSF && _inversionAlgorithm->HasGriddingCorrectionImage())
+	if(_isGriddingImageSaved && firstBeforePSF && _inversionAlgorithm->HasGriddingCorrectionImage())
 		imageGridding();
 	
 	_isFirstInversion = false;
@@ -929,8 +956,12 @@ void WSClean::performClean(size_t currentChannelIndex, bool& reachedMajorThresho
 				performJoinedPolFreqClean<2>(reachedMajorThreshold, majorIterationNr);
 			else throw std::runtime_error("Incompatible polarization combination for joined polarization cleaning");
 		}
-		else
-			throw std::runtime_error("Can only joinedly clean frequencies when cleaning all polarizations simultaneously. Image at least two polarizations and provide the '-joinpolarizations' option to enable this.");
+		else {
+			if(_polarizations.size() == 1)
+				performJoinedPolFreqClean<1>(reachedMajorThreshold, majorIterationNr);
+			else
+				throw std::runtime_error("Can only joinedly clean frequencies when cleaning the imaged polarizations simultaneously as well. Either provide the '-joinpolarizations' option to enable this, or image each polarization separately with separate WSClean commands.");
+		}
 	}
 	else if(_joinedPolarizationCleaning) {
 		if(Polarization::HasFullPolarization(_polarizations))
@@ -1077,7 +1108,12 @@ void WSClean::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majo
 		_psfImages.Load(psfImage, *_polarizations.begin(), ch, false);
 		psfImages.push_back(psfImage);
 		
-		if(hasStokesPols)
+		if(PolCount==1)
+		{
+			modelSet.Load(_modelImages, *_polarizations.begin(), ch);
+			residualSet.Load(_residualImages, *_polarizations.begin(), ch);
+		}
+		else if(hasStokesPols)
 		{
 			modelSet.LoadStokes(_modelImages, ch);
 			residualSet.LoadStokes(_residualImages, ch);
@@ -1095,7 +1131,12 @@ void WSClean::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majo
 	for(size_t ch=0; ch!=_channelsOut; ++ch)
 	{
 		_imageAllocator.Free(psfImages[ch]);
-		if(hasStokesPols)
+		if(PolCount == 1)
+		{
+			modelSet.Store(_modelImages, *_polarizations.begin(), ch);
+			residualSet.Store(_residualImages, *_polarizations.begin(), ch);
+		}
+		else if(hasStokesPols)
 		{
 			modelSet.StoreStokes(_modelImages, ch);
 			residualSet.StoreStokes(_residualImages, ch);
@@ -1153,6 +1194,7 @@ void WSClean::makeMFSImage(const string& suffix, PolarizationEnum pol, bool isIm
 		if(ch == 0)
 		{
 			writer = FitsWriter(reader);
+			copyWSCleanKeywords(reader, writer);
 			lowestFreq = reader.Frequency() - reader.Bandwidth()*0.5;
 			highestFreq = reader.Frequency() + reader.Bandwidth()*0.5;
 		}
@@ -1176,7 +1218,10 @@ void WSClean::makeMFSImage(const string& suffix, PolarizationEnum pol, bool isIm
 	for(size_t i=0; i!=size; ++i)
 		mfsImage[i] /= weightImage[i];
 	writer.SetFrequency((lowestFreq+highestFreq)*0.5, highestFreq-lowestFreq);
+	writer.SetNoBeamInfo();
 	writer.SetExtraKeyword("WSCIMGWG", weightSum);
+	writer.RemoveExtraKeyword("WSCCHANS");
+	writer.RemoveExtraKeyword("WSCCHANE");
 	writer.Write(getMFSPrefix(pol, isImaginary) + '-' + suffix, mfsImage.data());
 }
 

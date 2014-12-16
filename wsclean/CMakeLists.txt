@@ -10,7 +10,7 @@ find_library(CASA_CASA_LIB casa_casa REQUIRED)
 find_library(CASA_MEASURES_LIB casa_measures REQUIRED)
 find_library(CASA_FITS_LIB casa_fits REQUIRED)
 find_library(FFTW3_LIB fftw3 REQUIRED)
-find_package(Boost COMPONENTS thread system REQUIRED)
+find_package(Boost COMPONENTS filesystem thread system REQUIRED)
 find_library(PTHREAD_LIB pthread REQUIRED)
 find_library(FITSIO_LIB cfitsio REQUIRED)
 find_library(DL_LIB dl REQUIRED)
@@ -92,6 +92,6 @@ add_executable(wsclean wscleanmain.cpp wsclean.cpp fftconvolver.cpp fftresampler
 
 set_target_properties(wsclean PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
-target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB} ${PTHREAD_LIB})
+target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB} ${PTHREAD_LIB})
 
 install(TARGETS wsclean DESTINATION bin)
