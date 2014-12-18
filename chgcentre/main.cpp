@@ -135,7 +135,7 @@ MDirection ZenithDirectionEnd(MeasurementSet& set)
 
 void processField(
 	MeasurementSet &set, int fieldIndex, MSField &fieldTable, const MDirection &newDirection,
-	bool onlyUVW, bool shiftback)
+	bool onlyUVW, bool shiftback, bool flipUVWSign)
 {
 	MultiBandData bandData(set.spectralWindow(), set.dataDescription());
 	ROScalarColumn<casa::String> nameCol(fieldTable, fieldTable.columnName(MSFieldEnums::NAME));
@@ -231,6 +231,8 @@ void processField(
 
 				// Calculate the new UVW
 				MVuvw newUVW = uvws[antenna1].getValue() - uvws[antenna2].getValue();
+				if(flipUVWSign)
+					newUVW = -newUVW;
 				
 				// If one of the first results, output values for analyzing them.
 				if(row < 5)
@@ -547,7 +549,9 @@ int main(int argc, char **argv)
 			"\tchgcentre myset.ms 09h18m05.8s -12d05m44s\n\n";
 	} else {
 		int argi=1;
-		bool toZenith = false, toMinW = false, onlyUVW = false, shiftback = false, toGeozenith = false;
+		bool
+			toZenith = false, toMinW = false, onlyUVW = false,
+			shiftback = false, toGeozenith = false, flipUVWSign = false;
 		while(argv[argi][0] == '-')
 		{
 			std::string param(&argv[argi][1]);
@@ -570,6 +574,10 @@ int main(int argc, char **argv)
 			else if(param == "shiftback")
 			{
 				shiftback = true;
+			}
+			else if(param == "flipuvwsign")
+			{
+				flipUVWSign = true;
 			}
 			else throw std::runtime_error("Invalid parameter");
 			++argi;
@@ -605,7 +613,7 @@ int main(int argc, char **argv)
 				if(toGeozenith)
 					rotateToGeoZenith(set, fieldIndex, fieldTable, onlyUVW);
 				else
-					processField(set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback);
+					processField(set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback, flipUVWSign);
 			}
 		}
 	}
