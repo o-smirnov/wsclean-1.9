@@ -84,7 +84,9 @@ public:
 			_data(new HandleData(metaFile, msPath, dataColumnName, temporaryDirectory, channelParts, polarizations, selection))
 		{
 		}
-	}; 
+	};
+	
+	virtual void MakeMSRowToRowIdMapping(std::vector<size_t>& msToId, const MSSelection& selection);
 private:
 	static void unpartition(const Handle& handle);
 	

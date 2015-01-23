@@ -43,6 +43,8 @@ public:
 	}
 	
 	virtual double StartTime();
+	
+	virtual void MakeMSRowToRowIdMapping(std::vector<size_t>& msToId, const MSSelection& selection);
 private:
 	size_t _row;
 	size_t _timestep;

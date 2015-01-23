@@ -3,6 +3,7 @@
 
 #include <complex>
 #include <limits>
+#include <sstream>
 
 class Matrix2x2
 {
@@ -22,21 +23,21 @@ public:
 	}
 	
 	template<typename T, typename RHS_T>
-	static void Add(std::complex<T>* dest, RHS_T * rhs)
+	static void Add(std::complex<T>* dest, const RHS_T * rhs)
 	{
 		for(size_t p=0; p!=4; ++p)
 			dest[p] += rhs[p];
 	}
 	
 	template<typename T>
-	static void Subtract(std::complex<T>* dest, std::complex<T>* rhs)
+	static void Subtract(std::complex<T>* dest, const std::complex<T>* rhs)
 	{
 		for(size_t p=0; p!=4; ++p)
 			dest[p] -= rhs[p];
 	}
 	
 	template<typename T>
-	static bool IsFinite(std::complex<T>* matrix)
+	static bool IsFinite(const std::complex<T>* matrix)
 	{
 		return
 			std::isfinite(matrix[0].real()) && std::isfinite(matrix[0].imag()) &&
@@ -265,6 +266,103 @@ public:
 		matrix[0] = cosAlpha; matrix[1] = -sinAlpha;
 		matrix[2] = sinAlpha; matrix[3] = cosAlpha;
 	}
+};
+
+class MC2x2
+{
+public:
+	MC2x2() { }
+	MC2x2(const MC2x2& source) { Matrix2x2::Assign(_values, source._values); }
+	MC2x2(const double source[4]) { Matrix2x2::Assign(_values, source); }
+	MC2x2(double m00, double m01, double m10, double m11) {
+		_values[0] = m00; _values[1] = m01;
+		_values[2] = m10; _values[3] = m11;
+	}
+	MC2x2& operator=(const MC2x2& source)
+	{
+		Matrix2x2::Assign(_values, source._values);
+		return *this;
+	}
+	MC2x2& operator+=(const MC2x2& rhs)
+	{
+		Matrix2x2::Add(_values, rhs._values);
+		return *this;
+	}
+	MC2x2& operator*=(double rhs)
+	{
+		Matrix2x2::ScalarMultiply(_values, rhs);
+		return *this;
+	}
+	MC2x2& operator/=(double rhs)
+	{
+		Matrix2x2::ScalarMultiply(_values, 1.0/rhs);
+		return *this;
+	}
+	const std::complex<double>& operator[](size_t index) const { return _values[index]; }
+	std::complex<double>& operator[](size_t index) { return _values[index]; }
+	static MC2x2 Zero()
+	{
+		return MC2x2(0.0, 0.0, 0.0, 0.0);
+	}
+	static MC2x2 Unity()
+	{
+		return MC2x2(1.0, 0.0, 0.0, 1.0);
+	}
+	std::complex<double>* Data() { return _values; }
+	const std::complex<double>* Data() const { return _values; }
+	MC2x2 Multiply(const MC2x2& rhs) const
+	{
+		MC2x2 dest;
+		Matrix2x2::ATimesB(dest._values, _values, rhs._values);
+		return dest;
+	}
+	MC2x2 MultiplyHerm(const MC2x2& rhs) const
+	{
+		MC2x2 dest;
+		Matrix2x2::ATimesHermB(dest._values, _values, rhs._values);
+		return dest;
+	}
+	MC2x2 HermThenMultiply(const MC2x2& rhs) const
+	{
+		MC2x2 dest;
+		Matrix2x2::HermATimesB(dest._values, _values, rhs._values);
+		return dest;
+	}
+	MC2x2 HermThenMultiplyHerm(const MC2x2& rhs) const
+	{
+		MC2x2 dest;
+		Matrix2x2::HermATimesHermB(dest._values, _values, rhs._values);
+		return dest;
+	}
+	bool Invert()
+	{
+		return Matrix2x2::Invert(_values);
+	}
+	static void ATimesB(MC2x2& dest, const MC2x2& lhs, const MC2x2& rhs)
+	{
+		Matrix2x2::ATimesB(dest._values, lhs._values, rhs._values);
+	}
+	static void ATimesHermB(MC2x2& dest, const MC2x2& lhs, const MC2x2& rhs)
+	{
+		Matrix2x2::ATimesHermB(dest._values, lhs._values, rhs._values);
+	}
+	static void HermATimesB(MC2x2& dest, const MC2x2& lhs, const MC2x2& rhs)
+	{
+		Matrix2x2::HermATimesB(dest._values, lhs._values, rhs._values);
+	}
+	static void HermATimesHermB(MC2x2& dest, const MC2x2& lhs, const MC2x2& rhs)
+	{
+		Matrix2x2::HermATimesHermB(dest._values, lhs._values, rhs._values);
+	}
+	std::string ToString() const
+	{
+		std::stringstream str;
+		str << _values[0] << ", " << _values[1] << "; "
+			<< _values[2] << ", " << _values[3];
+		return str.str();
+	}
+private:
+	std::complex<double> _values[4];
 };
 
 #endif

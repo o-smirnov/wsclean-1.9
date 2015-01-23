@@ -1,8 +1,9 @@
 #include "cleanalgorithm.h"
 
 #include "../imagecoordinates.h"
-#include "../modelsource.h"
-#include "../model.h"
+
+#include "../model/modelsource.h"
+#include "../model/model.h"
 
 #include <unistd.h>
 

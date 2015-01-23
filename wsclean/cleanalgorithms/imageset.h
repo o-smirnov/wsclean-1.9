@@ -364,7 +364,7 @@ namespace clean_algorithms {
 		
 		double AbsJoinedValue(size_t index) const
 		{
-			return JoinedValue(index);
+			return std::fabs(JoinedValue(index));
 		}
 		
 		bool IsComponentNegative(size_t index) const

@@ -2,7 +2,7 @@
 #include <iostream>
 
 #include "modelrenderer.h"
-#include "model.h"
+#include "model/model.h"
 #include "imagecoordinates.h"
 #include "uvector.h"
 #include "fftconvolver.h"

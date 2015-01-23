@@ -24,6 +24,20 @@ set(CASA_LIBS ${CASA_MS_LIB} ${CASA_TABLES_LIB} ${CASA_MEASURES_LIB} ${CASA_CASA
 
 find_path(CASA_INCLUDE_DIR NAMES ms/MeasurementSets/MeasurementSet.h PATHS /usr/local/include/casacore PATH_SUFFIXES casacore)
 
+find_path(LOFAR_STATION_RESPONSE_DIR NAMES StationResponse/Station.h)
+find_library(LOFAR_STATION_RESPONSE_LIB stationresponse)
+if(LOFAR_STATION_RESPONSE_DIR AND LOFAR_STATION_RESPONSE_LIB)
+  include_directories(${LOFAR_STATION_RESPONSE_DIR})
+  set(LBEAM_LIBS ${LOFAR_STATION_RESPONSE_LIB})
+  set(LBEAM_FILES lofar/lbeamevaluator.cpp lofar/lmspredicter.cpp)
+  add_definitions(-DHAVE_LOFAR_BEAM)
+  message("LOFAR beam library found.")
+else()
+  set(LBEAM_LIBS "")
+  set(LBEAM_FILES lofar/lmspredicter.cpp)
+  message("LOFAR beam library not found: LOFAR beam will not be available in WSClean. This is not an error, it means the 'lofar-dft' mode will be unavailable, which is not used often. Hence, this message can probably be ignored.")
+endif(LOFAR_STATION_RESPONSE_DIR AND LOFAR_STATION_RESPONSE_LIB)
+
 include_directories(${CASA_INCLUDE_DIR})
 include_directories(${Boost_INCLUDE_DIR})
 include_directories(${FITSIO_INCLUDE_DIR})
@@ -88,10 +102,10 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_executable(wsclean wscleanmain.cpp wsclean.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp model.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/multiscaleclean.cpp cleanalgorithms/simpleclean.cpp msprovider/contiguousms.cpp msprovider/msprovider.cpp msprovider/partitionedms.cpp)
+add_executable(wsclean wscleanmain.cpp wsclean.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/multiscaleclean.cpp cleanalgorithms/simpleclean.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp ${LBEAM_FILES})
 
 set_target_properties(wsclean PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
-target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB} ${PTHREAD_LIB})
+target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB} ${PTHREAD_LIB} ${LBEAM_LIBS})
 
 install(TARGETS wsclean DESTINATION bin)

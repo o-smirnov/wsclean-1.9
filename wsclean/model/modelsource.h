@@ -7,9 +7,10 @@
 
 #include "sourcesdf.h"
 #include "sourcesdfwithsamples.h"
-#include "radeccoord.h"
 #include "spectralenergydistribution.h"
-#include "imagecoordinates.h"
+
+#include "../radeccoord.h"
+#include "../imagecoordinates.h"
 
 class ModelComponent
 {

@@ -213,3 +213,10 @@ void ContiguousMS::ReadWeights(float* buffer)
 	copyWeights(buffer,  startChannel, endChannel, _inputPolarizations, _dataArray, _weightArray, _flagArray, _polOut);
 }
 
+void ContiguousMS::MakeMSRowToRowIdMapping(std::vector<size_t>& msToId, const MSSelection&)
+{
+	size_t nRow = _ms.nrow();
+	msToId.resize(nRow);
+	for(size_t i=0; i!=nRow; ++i)
+		msToId[i] = i;
+}

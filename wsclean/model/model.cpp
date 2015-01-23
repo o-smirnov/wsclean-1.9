@@ -1,7 +1,7 @@
 #include "model.h"
-#include "radeccoord.h"
+#include "../radeccoord.h"
 
-#include "parser/modelparser.h"
+#include "modelparser.h"
 
 #include <algorithm>
 #include <cstdlib>

@@ -5,22 +5,27 @@
 #include "imageweights.h"
 #include "inversionalgorithm.h"
 #include "modelrenderer.h"
-#include "model.h"
 #include "msselection.h"
 #include "wsinversion.h"
+
+#include "model/model.h"
 
 #include "cleanalgorithms/cleanalgorithm.h"
 #include "cleanalgorithms/joinedclean.h"
 #include "cleanalgorithms/simpleclean.h"
 #include "cleanalgorithms/multiscaleclean.h"
 
-#include "msprovider/contiguousms.h"
+#include "msproviders/contiguousms.h"
 
-#include "parser/areaparser.h"
+#include "model/areaparser.h"
 
 #include "uvector.h"
 #include "gaussianfitter.h"
 #include "angle.h"
+#include "dftpredictionalgorithm.h"
+
+#include "lofar/lmspredicter.h"
+#include "progressbar.h"
 
 #include <iostream>
 #include <memory>
@@ -44,6 +49,7 @@ WSClean::WSClean() :
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
 	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false), _makePSF(false), _isGriddingImageSaved(false),
+	_dftPrediction(false), _dftWithBeam(false),
 	_temporaryDirectory(),
 	_forceReorder(false), _forceNoReorder(false), _joinedPolarizationCleaning(false), _joinedFrequencyCleaning(false),
 	_mfsWeighting(false), _multiscale(false),
@@ -303,6 +309,141 @@ void WSClean::predict(PolarizationEnum polarization, size_t joinedChannelIndex)
 	_predictingWatch.Pause();
 	_imageAllocator.Free(modelImageReal);
 	_imageAllocator.Free(modelImageImaginary);
+}
+
+void WSClean::dftPredict(size_t joinedChannelIndex)
+{
+	std::cout << std::flush << " == Predicting visibilities ==\n";
+	const size_t size = _imgWidth*_imgHeight;
+	double
+		*modelImageReal = _imageAllocator.Allocate(size),
+		*modelImageImaginary = 0;
+		
+	std::unique_ptr<DFTPredictionImage> image(new DFTPredictionImage(_imgWidth, _imgHeight, _imageAllocator));
+		
+	for(PolarizationEnum curPol : _polarizations)
+	{
+		if(curPol == Polarization::YX)
+		{
+			_modelImages.Load(modelImageReal, Polarization::XY, joinedChannelIndex, false);
+			modelImageImaginary = _imageAllocator.Allocate(size);
+			_modelImages.Load(modelImageImaginary, Polarization::XY, joinedChannelIndex, true);
+			for(size_t i=0; i!=size; ++i)
+				modelImageImaginary[i] = -modelImageImaginary[i];
+			image->Add(curPol, modelImageReal, modelImageImaginary);
+			_imageAllocator.Free(modelImageReal);
+		}
+		else {
+			_modelImages.Load(modelImageReal, curPol, joinedChannelIndex, false);
+			if(Polarization::IsComplex(curPol))
+			{
+				modelImageImaginary = _imageAllocator.Allocate(size);
+				_modelImages.Load(modelImageImaginary, curPol, joinedChannelIndex, true);
+				image->Add(curPol, modelImageReal, modelImageImaginary);
+				_imageAllocator.Free(modelImageReal);
+			}
+			else {
+				image->Add(curPol, modelImageReal);
+			}
+		}
+	}
+	_imageAllocator.Free(modelImageReal);
+	
+	casa::MeasurementSet firstMS(_filenames.front());
+	BandData firstBand(firstMS.spectralWindow());
+	DFTPredictionInput input;
+	image->FindComponents(input, _inversionAlgorithm->PhaseCentreRA(), _inversionAlgorithm->PhaseCentreDec(), _pixelScaleX, _pixelScaleY, _inversionAlgorithm->PhaseCentreDL(), _inversionAlgorithm->PhaseCentreDM(), firstBand.ChannelCount());
+	// Free the input model images
+	image.reset();
+	std::cout << "Number of components to be predicted: " << input.ComponentCount() << '\n';
+	
+	_predictingWatch.Start();
+	
+	for(size_t filenameIndex=0; filenameIndex!=_filenames.size(); ++filenameIndex)
+	{
+		const std::string& msName = _filenames[filenameIndex];
+		
+		size_t polIndex = 0;
+		std::vector<MSProvider*> msProviders(_polarizations.size());
+		for(PolarizationEnum pol : _polarizations)
+		{
+			msProviders[polIndex] = initializeMSProvider(filenameIndex, joinedChannelIndex, pol);
+			++polIndex;
+		}
+		casa::MeasurementSet ms(msName);
+		
+		size_t nRow = ms.nrow();
+		LMSPredicter predicter(ms, _threadCount);
+		predicter.SetApplyBeam(_dftWithBeam);
+		predicter.Input() = input;
+		
+		if(_dftWithBeam)
+		{
+			std::cout << "Converting model to absolute values...\n";
+			predicter.Input().ConvertApparentToAbsolute(ms);
+		}
+		
+		std::cout << "Creating row mapping...\n";
+		std::vector<size_t> msToRowId;
+		msProviders[0]->MakeMSRowToRowIdMapping(msToRowId, _globalSelection);
+		
+		ProgressBar progress("Predicting visibilities for " + msName);
+		BandData band(ms.spectralWindow());
+		predicter.Start();
+		LMSPredicter::RowData row;
+		ao::uvector<std::complex<float>> buffer[4];
+		for(size_t p=0; p!=_polarizations.size(); ++p)
+			buffer[p].assign(band.ChannelCount(), std::complex<float>(0.0));
+		
+		while(predicter.GetNextRow(row))
+		{
+			// Write to MS provider(s)
+			polIndex = 0;
+			for(PolarizationEnum pol : _polarizations)
+			{
+				for(size_t ch=0; ch!=band.ChannelCount(); ++ch)
+				{
+					switch(pol)
+					{
+						case Polarization::XX:
+							buffer[polIndex][ch] = row.modelData[ch][0];
+							break;
+						case Polarization::XY:
+							buffer[polIndex][ch] = row.modelData[ch][1];
+							break;
+						case Polarization::YX:
+							buffer[polIndex][ch] = row.modelData[ch][2];
+							break;
+						case Polarization::YY:
+							buffer[polIndex][ch] = row.modelData[ch][3];
+							break;
+						case Polarization::StokesI:
+							buffer[polIndex][ch] =
+								(row.modelData[ch][0] +
+								row.modelData[ch][3])*0.5;
+							break;
+						default:
+							throw std::runtime_error("Can't predict for this polarization at the moment");
+					}
+				}
+				++polIndex;
+			}
+			
+			boost::mutex::scoped_lock lock(predicter.IOMutex());
+			for(size_t polIndex=0; polIndex!=_polarizations.size(); ++polIndex)
+			{
+				msProviders[polIndex]->WriteModel(msToRowId[row.rowIndex], buffer[polIndex].data());
+			}
+			lock.unlock();
+				
+			predicter.FinishRow(row);
+			progress.SetProgress(row.rowIndex+1, nRow);
+		}
+		for(MSProvider* provider : msProviders)
+			delete provider;
+	}
+	
+	_predictingWatch.Pause();
 }
 
 void WSClean::initializeImageWeights(const MSSelection& partSelection)
@@ -697,19 +838,35 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 					else {
 						currentChannelIndex = outChannelIndex;
 					}
-					for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
+					if(_dftPrediction)
 					{
-						prepareInversionAlgorithm(*curPol);
-						
-						initializeCurMSProviders(currentChannelIndex, *curPol);
-						if(*curPol == *_polarizations.begin())
-							initializeImageWeights(_currentPartSelection);
-	
-						predict(*curPol, ch);
-						
-						imageMainNonFirst(*curPol, ch);
-						clearCurMSProviders();
-					} // end of polarization loop
+						dftPredict(ch);
+						for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
+						{
+							prepareInversionAlgorithm(*curPol);
+							initializeCurMSProviders(currentChannelIndex, *curPol);
+							if(*curPol == *_polarizations.begin())
+								initializeImageWeights(_currentPartSelection);
+		
+							imageMainNonFirst(*curPol, ch);
+							clearCurMSProviders();
+						}
+					}
+					else {
+						for(std::set<PolarizationEnum>::const_iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
+						{
+							prepareInversionAlgorithm(*curPol);
+							
+							initializeCurMSProviders(currentChannelIndex, *curPol);
+							if(*curPol == *_polarizations.begin())
+								initializeImageWeights(_currentPartSelection);
+		
+							predict(*curPol, ch);
+							
+							imageMainNonFirst(*curPol, ch);
+							clearCurMSProviders();
+						} // end of polarization loop
+					}
 					_currentPartSelection = selectionBefore;
 				} // end of joined channels loop
 				
@@ -862,16 +1019,20 @@ void WSClean::predictChannel(size_t outChannelIndex)
 	_inversionAlgorithm.reset();
 }
 
+MSProvider* WSClean::initializeMSProvider(size_t filenameIndex, size_t currentChannelIndex, PolarizationEnum polarization)
+{
+	if(_doReorder)
+		return new PartitionedMS(_partitionedMSHandles[filenameIndex], currentChannelIndex, polarization);
+	else
+		return new ContiguousMS(_filenames[filenameIndex], _columnName, _currentPartSelection, polarization, _mGain != 1.0);
+}
+
 void WSClean::initializeCurMSProviders(size_t currentChannelIndex, PolarizationEnum polarization)
 {
 	_inversionAlgorithm->ClearMeasurementSetList();
 	for(size_t i=0; i != _filenames.size(); ++i)
 	{
-		MSProvider* msProvider;
-		if(_doReorder)
-			msProvider = new PartitionedMS(_partitionedMSHandles[i], currentChannelIndex, polarization);
-		else
-			msProvider = new ContiguousMS(_filenames[i], _columnName, _currentPartSelection, polarization, _mGain != 1.0);
+		MSProvider* msProvider = initializeMSProvider(i, currentChannelIndex, polarization);
 		_inversionAlgorithm->AddMeasurementSet(msProvider);
 		_currentPolMSes.push_back(msProvider);
 	}

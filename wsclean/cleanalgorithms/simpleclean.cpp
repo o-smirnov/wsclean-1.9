@@ -1,8 +1,7 @@
 #include "simpleclean.h"
 
 #include "../imagecoordinates.h"
-#include "../modelsource.h"
-#include "../model.h"
+
 #include "../lane.h"
 #include "../areaset.h"
 

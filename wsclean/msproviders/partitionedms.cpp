@@ -607,3 +607,37 @@ void PartitionedMS::Handle::decrease()
 		delete _data;
 	}
 }
+
+void PartitionedMS::MakeMSRowToRowIdMapping(std::vector<size_t>& msToId, const MSSelection& selection)
+{
+	const size_t nRow = _ms.nrow();
+	casa::ROArrayColumn<double> uvwColumn(_ms, casa::MS::columnName(casa::MSMainEnums::UVW));
+	casa::ROScalarColumn<int> antenna1Column(_ms, casa::MS::columnName(casa::MSMainEnums::ANTENNA1));
+	casa::ROScalarColumn<int> antenna2Column(_ms, casa::MS::columnName(casa::MSMainEnums::ANTENNA2));
+	casa::ROScalarColumn<int> fieldIdColumn(_ms, casa::MS::columnName(casa::MSMainEnums::FIELD_ID));
+	casa::ROScalarColumn<double> timeColumn(_ms, casa::MS::columnName(casa::MSMainEnums::TIME));
+	size_t startRow, endRow;
+	getRowRange(_ms, selection, startRow, endRow);
+	
+	msToId.assign(startRow, 0);
+	size_t currentRowId = 0;
+	size_t timestep = selection.HasInterval() ? selection.IntervalStart() : 0;
+	double time = timeColumn(startRow);
+	for(size_t row=startRow; row!=endRow; ++row)
+	{
+		msToId.push_back(currentRowId);
+		const int
+			a1 = antenna1Column(row), a2 = antenna2Column(row),
+			fieldId = fieldIdColumn(row);
+		casa::Vector<double> uvw = uvwColumn(row);
+		if(time != timeColumn(row))
+		{
+			++timestep;
+			time = timeColumn(row);
+		}
+		if(selection.IsSelected(fieldId, timestep, a1, a2, uvw))
+			++currentRowId;
+	}
+	for(size_t i=0; i!=nRow-endRow; ++i)
+		msToId.push_back(0);
+}
