@@ -399,11 +399,11 @@ void WSClean::dftPredict(size_t joinedChannelIndex)
 		{
 			// Write to MS provider(s)
 			polIndex = 0;
-			for(PolarizationEnum pol : _polarizations)
+			for(std::set<PolarizationEnum>::iterator pol=_polarizations.begin(); pol!=_polarizations.end(); ++pol)
 			{
 				for(size_t ch=0; ch!=band.ChannelCount(); ++ch)
 				{
-					switch(pol)
+					switch(*pol)
 					{
 						case Polarization::XX:
 							buffer[polIndex][ch] = row.modelData[ch][0];
