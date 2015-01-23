@@ -164,10 +164,10 @@ void DFTPredictionInput::ConvertApparentToAbsolute(casa::MeasurementSet& ms)
 	casa::MEpoch::ROScalarColumn timeColumn(ms, ms.columnName(casa::MSMainEnums::TIME));
 	size_t nrow = ms.nrow();
 
-	for(ComponentInfo& cInfo : compInfos)
+	for(std::vector<ComponentInfo>::iterator cInfo=compInfos.begin(); cInfo!=compInfos.end(); ++cInfo)
 	{
-		cInfo.beamValues.assign(band.ChannelCount(), MC2x2::Zero());
-		cInfo.count.assign(band.ChannelCount(), 0);
+		cInfo->beamValues.assign(band.ChannelCount(), MC2x2::Zero());
+		cInfo->count.assign(band.ChannelCount(), 0);
 	}
 	
 	ProgressBar progress("Evaluating beam");
@@ -253,9 +253,9 @@ void DFTPredictionAlgorithm::Predict(MC2x2& dest, double u, double v, double w, 
 {
 	dest = MC2x2::Zero();
 	MC2x2 single;
-	for(const DFTPredictionComponent& c : _input)
+	for(DFTPredictionInput::const_iterator c=_input.begin(); c!=_input.end(); ++c)
 	{
-		predict(single, u, v, w, channelIndex, a1, a2, c);
+		predict(single, u, v, w, channelIndex, a1, a2, *c);
 		dest += single;
 	}
 }
@@ -299,14 +299,14 @@ void DFTPredictionAlgorithm::predict(MC2x2& dest, double u, double v, double w, 
 
 void DFTPredictionAlgorithm::UpdateBeam(LBeamEvaluator& beamEvaluator)
 {
-	for(DFTPredictionComponent& component : _input)
+	for(DFTPredictionInput::iterator component=_input.begin(); component!=_input.end(); ++component)
 	{
 		LBeamEvaluator::PrecalcPosInfo posInfo;
-		beamEvaluator.PrecalculatePositionInfo(posInfo, component.RA(), component.Dec());
+		beamEvaluator.PrecalculatePositionInfo(posInfo, component->RA(), component->Dec());
 		
-		for(size_t antenna=0; antenna!=component.AntennaCount(); ++antenna)
+		for(size_t antenna=0; antenna!=component->AntennaCount(); ++antenna)
 		{
-			DFTAntennaInfo& antennaInfo = component.AntennaInfo(antenna);
+			DFTAntennaInfo& antennaInfo = component->AntennaInfo(antenna);
 			
 			for(size_t channel=0; channel!=antennaInfo.ChannelCount(); ++channel)
 			{

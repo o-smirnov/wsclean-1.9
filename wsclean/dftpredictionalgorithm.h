@@ -125,6 +125,9 @@ private:
 class DFTPredictionInput
 {
 public:
+	typedef std::vector<DFTPredictionComponent>::iterator iterator;
+	typedef std::vector<DFTPredictionComponent>::const_iterator const_iterator;
+	
 	DFTPredictionInput() { }
 	void InitializeFromModel(const class Model& model, long double phaseCentreRA, long double phaseCentreDec, const BandData& band);
 	void AddComponent(const DFTPredictionComponent& component)
@@ -138,19 +141,19 @@ public:
 	}
 	size_t ComponentCount() const { return _components.size(); }
 	void InitializeBeamBuffers(size_t antennaCount, size_t channelCount) {
-		for(std::vector<DFTPredictionComponent>::iterator c=_components.begin(); c!=_components.end(); ++c)
+		for(iterator c=begin(); c!=end(); ++c)
 			c->InitializeBeamBuffers(antennaCount, channelCount);
 	}
 	void SetUnitaryBeam() {
-		for(std::vector<DFTPredictionComponent>::iterator c=_components.begin(); c!=_components.end(); ++c)
+		for(iterator c=begin(); c!=end(); ++c)
 			c->SetUnitaryBeam();
 	}
 	void ConvertApparentToAbsolute(casa::MeasurementSet& ms);
 	
-	std::vector<DFTPredictionComponent>::const_iterator begin() const { return _components.begin(); }
-	std::vector<DFTPredictionComponent>::const_iterator end() const { return _components.end(); }
-	std::vector<DFTPredictionComponent>::iterator begin() { return _components.begin(); }
-	std::vector<DFTPredictionComponent>::iterator end() { return _components.end(); }
+	const_iterator begin() const { return _components.begin(); }
+	const_iterator end() const { return _components.end(); }
+	iterator begin() { return _components.begin(); }
+	iterator end() { return _components.end(); }
 private:
 	std::vector<DFTPredictionComponent> _components;
 };
