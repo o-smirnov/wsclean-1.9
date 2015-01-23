@@ -31,8 +31,8 @@ public:
 	size_t ChannelCount() const { return _beamValuesPerChannel.size(); }
 	void InitializeChannelBuffers(size_t channelCount) { _beamValuesPerChannel.resize(channelCount); }
 	void SetUnitaryBeam() {
-		for(MC2x2& m : _beamValuesPerChannel)
-			m = MC2x2::Unity();
+		for(std::vector<MC2x2>::iterator i = _beamValuesPerChannel.begin(); i!=_beamValuesPerChannel.end(); ++i)
+			*i = MC2x2::Unity();
 	}
 private:
 	std::vector<MC2x2> _beamValuesPerChannel;
@@ -83,12 +83,12 @@ public:
 	void InitializeBeamBuffers(size_t antennaCount, size_t channelCount)
 	{
 		_beamValuesPerAntenna.resize(antennaCount);
-		for(DFTAntennaInfo& a : _beamValuesPerAntenna)
-			a.InitializeChannelBuffers(channelCount);
+		for(std::vector<DFTAntennaInfo>::iterator a = _beamValuesPerAntenna.begin(); a!=_beamValuesPerAntenna.end(); ++a)
+			a->InitializeChannelBuffers(channelCount);
 	}
 	void SetUnitaryBeam() {
-		for(DFTAntennaInfo& a : _beamValuesPerAntenna)
-			a.SetUnitaryBeam();
+		for(std::vector<DFTAntennaInfo>::iterator a = _beamValuesPerAntenna.begin(); a!=_beamValuesPerAntenna.end(); ++a)
+			a->SetUnitaryBeam();
 	}
 private:
 	void initializeGaussian(double positionAngle, double majorAxis, double minorAxis)
@@ -138,12 +138,12 @@ public:
 	}
 	size_t ComponentCount() const { return _components.size(); }
 	void InitializeBeamBuffers(size_t antennaCount, size_t channelCount) {
-		for(DFTPredictionComponent& c : _components)
-			c.InitializeBeamBuffers(antennaCount, channelCount);
+		for(std::vector<DFTPredictionComponent>::iterator c=_components.begin(); c!=_components.end(); ++c)
+			c->InitializeBeamBuffers(antennaCount, channelCount);
 	}
 	void SetUnitaryBeam() {
-		for(DFTPredictionComponent& c : _components)
-			c.SetUnitaryBeam();
+		for(std::vector<DFTPredictionComponent>::iterator c=_components.begin(); c!=_components.end(); ++c)
+			c->SetUnitaryBeam();
 	}
 	void ConvertApparentToAbsolute(casa::MeasurementSet& ms);
 	

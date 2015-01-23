@@ -321,29 +321,29 @@ void WSClean::dftPredict(size_t joinedChannelIndex)
 		
 	std::unique_ptr<DFTPredictionImage> image(new DFTPredictionImage(_imgWidth, _imgHeight, _imageAllocator));
 		
-	for(PolarizationEnum curPol : _polarizations)
+	for(std::set<PolarizationEnum>::iterator curPol=_polarizations.begin(); curPol!=_polarizations.end(); ++curPol)
 	{
-		if(curPol == Polarization::YX)
+		if(*curPol == Polarization::YX)
 		{
 			_modelImages.Load(modelImageReal, Polarization::XY, joinedChannelIndex, false);
 			modelImageImaginary = _imageAllocator.Allocate(size);
 			_modelImages.Load(modelImageImaginary, Polarization::XY, joinedChannelIndex, true);
 			for(size_t i=0; i!=size; ++i)
 				modelImageImaginary[i] = -modelImageImaginary[i];
-			image->Add(curPol, modelImageReal, modelImageImaginary);
+			image->Add(*curPol, modelImageReal, modelImageImaginary);
 			_imageAllocator.Free(modelImageReal);
 		}
 		else {
-			_modelImages.Load(modelImageReal, curPol, joinedChannelIndex, false);
-			if(Polarization::IsComplex(curPol))
+			_modelImages.Load(modelImageReal, *curPol, joinedChannelIndex, false);
+			if(Polarization::IsComplex(*curPol))
 			{
 				modelImageImaginary = _imageAllocator.Allocate(size);
-				_modelImages.Load(modelImageImaginary, curPol, joinedChannelIndex, true);
-				image->Add(curPol, modelImageReal, modelImageImaginary);
+				_modelImages.Load(modelImageImaginary, *curPol, joinedChannelIndex, true);
+				image->Add(*curPol, modelImageReal, modelImageImaginary);
 				_imageAllocator.Free(modelImageReal);
 			}
 			else {
-				image->Add(curPol, modelImageReal);
+				image->Add(*curPol, modelImageReal);
 			}
 		}
 	}
@@ -365,9 +365,9 @@ void WSClean::dftPredict(size_t joinedChannelIndex)
 		
 		size_t polIndex = 0;
 		std::vector<MSProvider*> msProviders(_polarizations.size());
-		for(PolarizationEnum pol : _polarizations)
+		for(std::set<PolarizationEnum>::iterator pol=_polarizations.begin(); pol!=_polarizations.end(); ++pol)
 		{
-			msProviders[polIndex] = initializeMSProvider(filenameIndex, joinedChannelIndex, pol);
+			msProviders[polIndex] = initializeMSProvider(filenameIndex, joinedChannelIndex, *pol);
 			++polIndex;
 		}
 		casa::MeasurementSet ms(msName);
@@ -439,8 +439,8 @@ void WSClean::dftPredict(size_t joinedChannelIndex)
 			predicter.FinishRow(row);
 			progress.SetProgress(row.rowIndex+1, nRow);
 		}
-		for(MSProvider* provider : msProviders)
-			delete provider;
+		for(std::vector<MSProvider*>::iterator provider=msProviders.begin(); provider!=msProviders.end(); ++provider)
+			delete *provider;
 	}
 	
 	_predictingWatch.Pause();
