@@ -8,14 +8,18 @@ else
 		mkdir /tmp/wsclean/aocommon
 		mkdir /tmp/wsclean/beam
 		mkdir /tmp/wsclean/cleanalgorithms
-		mkdir /tmp/wsclean/msprovider
+		mkdir /tmp/wsclean/lofar
+		mkdir /tmp/wsclean/model
+		mkdir /tmp/wsclean/msproviders
 		mkdir /tmp/wsclean/parser
 		cd ..
-		cp -v CMakeLists.txt angle.h areaset.* banddata.* beamevaluator.* buffered_lane.* cachedimageset.* fftconvolver.* fftresampler.* fitsiochecker.* fitsreader.* fitswriter.* gaussianfitter.h imagecoordinates.* imagebufferallocator.* imageweights.* inversionalgorithm.* lane.* layeredimager.* multibanddata.* nlplfitter.* matrix2x2.* model.* modelrenderer.* modelsource.* msselection.* polarizationenum.* progressbar.* radeccoord.* sourcesdf.* sourcesdfwithsamples.* spectralenergydistribution.* stopwatch.* tilebeam.* uvector.* uvwdistribution.* weightmode.* wsclean.* wscleanmain.cpp wsinversion.* wscversion.h /tmp/wsclean/
+		cp -v CMakeLists.txt angle.h areaset.* banddata.* beamevaluator.* buffered_lane.* cachedimageset.* dftpredictionalgorithm.* fftconvolver.* fftresampler.* fitsiochecker.* fitsreader.* fitswriter.* gaussianfitter.h imagecoordinates.* imagebufferallocator.* imageweights.* inversionalgorithm.* lane.* layeredimager.* multibanddata.* nlplfitter.* matrix2x2.* modelrenderer.* msselection.* polarizationenum.* progressbar.* radeccoord.* sourcesdf.* sourcesdfwithsamples.* spectralenergydistribution.* stopwatch.* tilebeam.* uvector.* uvwdistribution.* weightmode.* wsclean.* wscleanmain.cpp wsinversion.* wscversion.h /tmp/wsclean/
 		cp -v aocommon/lane.h aocommon/lane_03.h aocommon/lane_11.h aocommon/uvector.h aocommon/uvector_03.h /tmp/wsclean/aocommon/
 		cp -v beam/*.{h,cpp} /tmp/wsclean/beam
 		cp -v cleanalgorithms/*.{h,cpp} /tmp/wsclean/cleanalgorithms/
-		cp -v msprovider/*.{h,cpp} /tmp/wsclean/msprovider
+		cp -v lofar/*.{h,cpp} /tmp/wsclean/lofar/
+		cp -v model/*.{h,cpp} /tmp/wsclean/model/
+		cp -v msproviders/*.{h,cpp} /tmp/wsclean/msproviders
 		cp -v parser/*.h /tmp/wsclean/parser
 		cd /tmp
 		mv wsclean wsclean-${VERSION}
