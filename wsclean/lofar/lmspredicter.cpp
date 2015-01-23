@@ -28,8 +28,8 @@ void LMSPredicter::InitializeInput(const Model& model)
 
 void LMSPredicter::clearBuffers()
 {
-	for(MC2x2* buffer : _buffers)
-		delete[] buffer;
+	for(std::vector<MC2x2*>::iterator buffer=_buffers.begin(); buffer!=_buffers.end(); ++buffer)
+		delete[] *buffer;
 }
 
 void LMSPredicter::Start()
