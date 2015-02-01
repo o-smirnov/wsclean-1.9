@@ -87,6 +87,8 @@ public:
 	void SetSaveGriddingImage(bool isGriddingImageSaved) { _isGriddingImageSaved = isGriddingImageSaved; }
 	void SetDFTPrediction(bool dftPrediction) { _dftPrediction = dftPrediction; }
 	void SetDFTWithBeam(bool applyBeam) { _dftWithBeam = applyBeam; }
+	void SetUseMoreSane(bool useMoreSane) { _useMoreSane = useMoreSane; }
+	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
 	
 	void AddInputMS(const std::string& msPath) { _filenames.push_back(msPath); }
 	
@@ -204,8 +206,8 @@ private:
 	std::set<PolarizationEnum> _polarizations;
 	WeightMode _weightMode;
 	std::string _prefixName;
-	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _makePSF, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
-	std::string _temporaryDirectory;
+	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _useMoreSane, _makePSF, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
+	std::string _temporaryDirectory, _moreSaneLocation;
 	bool _forceReorder, _forceNoReorder, _joinedPolarizationCleaning, _joinedFrequencyCleaning, _mfsWeighting, _multiscale;
 	enum LayeredImager::GridModeEnum _gridMode;
 	std::vector<std::string> _filenames;

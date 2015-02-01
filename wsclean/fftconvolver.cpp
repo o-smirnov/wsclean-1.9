@@ -10,11 +10,19 @@
 void FFTConvolver::Convolve(double* image, size_t imgWidth, size_t imgHeight, const double* kernel, size_t kernelSize)
 {
 	ao::uvector<double> scaledKernel(imgWidth * imgHeight, 0.0);
-	PrepareKernel(scaledKernel.data(), imgWidth, imgHeight, kernel, kernelSize);
+	PrepareSmallKernel(scaledKernel.data(), imgWidth, imgHeight, kernel, kernelSize);
 	ConvolveSameSize(image, scaledKernel.data(), imgWidth, imgHeight);
 }
 
-void FFTConvolver::PrepareKernel(double* dest, size_t imgWidth, size_t imgHeight, const double* kernel, size_t kernelSize)
+void FFTConvolver::ReverseAndConvolve(double* image, size_t imgWidth, size_t imgHeight, const double* kernel, size_t kernelSize)
+{
+	ao::uvector<double> scaledKernel(imgWidth * imgHeight, 0.0);
+	
+	PrepareSmallKernel(scaledKernel.data(), imgWidth, imgHeight, kernel, kernelSize);
+	ConvolveSameSize(image, scaledKernel.data(), imgWidth, imgHeight);
+}
+
+void FFTConvolver::PrepareSmallKernel(double* dest, size_t imgWidth, size_t imgHeight, const double* kernel, size_t kernelSize)
 {
 	if(kernelSize > imgWidth || kernelSize > imgHeight)
 		throw std::runtime_error("Kernel size > image dimension");
@@ -58,7 +66,7 @@ void FFTConvolver::PrepareKernel(double* dest, size_t imgWidth, size_t imgHeight
 	}
 }
 
-void FFTConvolver::PrepareForConvolution(double* dest, const double* source, size_t imgWidth, size_t imgHeight)
+void FFTConvolver::PrepareKernel(double* dest, const double* source, size_t imgWidth, size_t imgHeight)
 {
 	const double* sourceIter = source;
 	for(size_t y=0; y!=imgHeight/2; ++y)
@@ -130,3 +138,17 @@ void FFTConvolver::ConvolveSameSize(double* image, const double* kernel, size_t 
 	fftw_destroy_plan(fToOutPlan);
 }
 
+void FFTConvolver::Reverse(double* image, size_t imgWidth, size_t imgHeight)
+{
+	for(size_t y=0; y!=imgHeight/2; ++y)
+	{
+		size_t destY = imgHeight-1 - y;
+		double* sourcePtr = &image[y*imgWidth];
+		double* destPtr = &image[destY*imgWidth];
+		for(size_t x=0; x!=imgWidth/2; ++x)
+		{
+			size_t destX = imgWidth-1 - x;
+			std::swap(sourcePtr[x], destPtr[destX]);
+		}
+	}
+}

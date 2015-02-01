@@ -158,7 +158,7 @@ template void ModelRenderer::Restore(
 	long double startFrequency, long double endFrequency, PolarizationEnum polarization);
 
 /**
- * Restore a complex image (e.g. produced with multi-scale clean
+ * Restore a complex image (e.g. produced with multi-scale clean)
  */
 template<typename NumType>
 void ModelRenderer::Restore(NumType* imageData, NumType* modelData, size_t imageWidth, size_t imageHeight, long double beamMaj, long double beamMin, long double beamPA, PolarizationEnum polarization)
@@ -182,7 +182,7 @@ void ModelRenderer::Restore(NumType* imageData, NumType* modelData, size_t image
 	
 	size_t minDimension = std::min(imageWidth, imageHeight);
 	size_t boundingBoxSize = std::min<size_t>(ceil(sigmaMax * 40.0 / std::min(_pixelScaleL, _pixelScaleM)), minDimension);
-	if(boundingBoxSize%2==0) ++boundingBoxSize;
+	if(boundingBoxSize%2!=0) ++boundingBoxSize;
 	ao::uvector<NumType> kernel(boundingBoxSize*boundingBoxSize);
 	typename ao::uvector<NumType>::iterator i=kernel.begin();
 	for(size_t y=0; y!=boundingBoxSize; ++y)

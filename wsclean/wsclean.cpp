@@ -13,6 +13,7 @@
 #include "cleanalgorithms/cleanalgorithm.h"
 #include "cleanalgorithms/joinedclean.h"
 #include "cleanalgorithms/simpleclean.h"
+#include "cleanalgorithms/moresane.h"
 #include "cleanalgorithms/multiscaleclean.h"
 
 #include "msproviders/contiguousms.h"
@@ -48,7 +49,8 @@ WSClean::WSClean() :
 	_polarizations(),
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
-	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false), _makePSF(false), _isGriddingImageSaved(false),
+	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false),
+	_useMoreSane(false), _makePSF(false), _isGriddingImageSaved(false),
 	_dftPrediction(false), _dftWithBeam(false),
 	_temporaryDirectory(),
 	_forceReorder(false), _forceNoReorder(false), _joinedPolarizationCleaning(false), _joinedFrequencyCleaning(false),
@@ -514,7 +516,13 @@ void WSClean::initializeCleanAlgorithm()
 	freeCleanAlgorithms();
 	size_t count = 0;
 	double beamSize = _inversionAlgorithm->BeamSize();
-	if(_joinedPolarizationCleaning)
+	if(_useMoreSane)
+	{
+		_cleanAlgorithms.resize(1);
+		_cleanAlgorithms[0] = new MoreSane(_moreSaneLocation);
+		count = 1;
+	}
+	else if(_joinedPolarizationCleaning)
 	{
 		size_t polCount;
 		if(Polarization::HasFullPolarization(_polarizations))
@@ -916,7 +924,7 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 					double* modelImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
 					_modelImages.Load(modelImage, *curPol, currentChannelIndex, *isImaginary);
 					ModelRenderer renderer(_fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM());
-					if(_multiscale)
+					if(_multiscale || _useMoreSane)
 					{
 						std::cout << "Rendering sources to restored image... " << std::flush;
 						renderer.Restore(restoredImage, modelImage, _imgWidth, _imgHeight, _fitsWriter.BeamSizeMajorAxis(), _fitsWriter.BeamSizeMinorAxis(), _fitsWriter.BeamPositionAngle(), Polarization::StokesI);

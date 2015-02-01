@@ -111,7 +111,7 @@ void MultiScaleClean<ImageSetType>::executeMajorIterationForScale(double current
 	size_t kernelSize;
 	MakeShapeFunction(currentScale * rescaleFactor, shape, kernelSize);
 	memset(kernelImage, 0, sizeof(double) * _rescaledWidth * _rescaledHeight);
-	FFTConvolver::PrepareKernel(kernelImage, _rescaledWidth, _rescaledHeight, shape.data(), kernelSize);
+	FFTConvolver::PrepareSmallKernel(kernelImage, _rescaledWidth, _rescaledHeight, shape.data(), kernelSize);
 	for(size_t i=0; i!=largeScaleImage.ImageCount(); ++i)
 		FFTConvolver::ConvolveSameSize(largeScaleImage.GetImage(i), kernelImage, _rescaledWidth, _rescaledHeight);
 	for(size_t i=0; i!=scaledPsfs.size(); ++i) {
@@ -121,7 +121,7 @@ void MultiScaleClean<ImageSetType>::executeMajorIterationForScale(double current
 	
 	MakeShapeFunction(nextScale * rescaleFactor, shape, kernelSize);
 	memset(kernelImage, 0, sizeof(double) * _rescaledWidth * _rescaledHeight);
-	FFTConvolver::PrepareKernel(kernelImage, _rescaledWidth, _rescaledHeight, shape.data(), kernelSize);
+	FFTConvolver::PrepareSmallKernel(kernelImage, _rescaledWidth, _rescaledHeight, shape.data(), kernelSize);
 	for(size_t i=0; i!=nextScaleImage.ImageCount(); ++i)
 		FFTConvolver::ConvolveSameSize(nextScaleImage.GetImage(i), kernelImage, _rescaledWidth, _rescaledHeight);
 	
@@ -221,7 +221,7 @@ void MultiScaleClean<ImageSetType>::executeMajorIterationForScale(double current
 	
 	MakeShapeFunction(currentScale * rescaleFactor, shape, kernelSize);
 	memset(kernelImage, 0, sizeof(double) * _rescaledWidth * _rescaledHeight);
-	FFTConvolver::PrepareKernel(kernelImage, _rescaledWidth, _rescaledHeight, shape.data(), kernelSize);
+	FFTConvolver::PrepareSmallKernel(kernelImage, _rescaledWidth, _rescaledHeight, shape.data(), kernelSize);
 	
 	double* convolvedModel = allocator.Allocate(_originalWidth * _originalHeight);
 	double* preparedPsf = allocator.Allocate(_originalWidth * _originalHeight);
@@ -239,7 +239,7 @@ void MultiScaleClean<ImageSetType>::executeMajorIterationForScale(double current
 			++modelPtr;
 			++dest;
 		}
-		FFTConvolver::PrepareForConvolution(preparedPsf, (*_originalPsfs)[_modelImage->PSFIndex(i)], _originalWidth, _originalHeight);
+		FFTConvolver::PrepareKernel(preparedPsf, (*_originalPsfs)[_modelImage->PSFIndex(i)], _originalWidth, _originalHeight);
 		FFTConvolver::ConvolveSameSize(convolvedModel, preparedPsf, _originalWidth, _originalHeight);
 		dest = _dataImageOriginal->GetImage(i);
 		destEnd = dest + _originalWidth*_originalHeight;

@@ -158,6 +158,8 @@ int main(int argc, char *argv[])
 			"   Default on: opposite of -nonegative.\n"
 			"-stopnegative\n"
 			"   Stop on negative components. Not the default.\n"
+			"-moresane <location>\n"
+			"   Use the MoreSane deconvolution algorithm, installed at the specified location.\n"
 			"\n"
 			"  ** RESTORATION OPTIONS **\n"
 			"-beamsize <arcmin>\n"
@@ -262,6 +264,12 @@ int main(int argc, char *argv[])
 		else if(param == "stopnegative")
 		{
 			wsclean.SetStopOnNegative(true);
+		}
+		else if(param == "moresane")
+		{
+			++argi;
+			wsclean.SetUseMoreSane(true);
+			wsclean.SetMoreSaneLocation(argv[argi]);
 		}
 		else if(param == "makepsf")
 		{
