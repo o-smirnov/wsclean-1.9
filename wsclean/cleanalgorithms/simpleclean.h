@@ -59,7 +59,7 @@ class SimpleClean : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
 			}
 		}
 
-		static double FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, const class AreaSet &cleanAreas);
+		static double FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, const bool* cleanMask);
 
 #if defined __AVX__ && !defined FORCE_NON_AVX
 		template<bool AllowNegativeComponent>
@@ -83,7 +83,7 @@ class SimpleClean : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
 		}
 #endif
 
-		static double FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const class AreaSet &cleanAreas);
+		static double FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const bool* cleanMask);
 		
 		static void SubtractImage(double *image, const double *psf, size_t width, size_t height, size_t x, size_t y, double factor);
 		

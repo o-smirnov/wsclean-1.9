@@ -19,7 +19,7 @@ CleanAlgorithm::CleanAlgorithm() :
 	_threadCount(sysconf(_SC_NPROCESSORS_ONLN)),
 	_allowNegativeComponents(true),
 	_stopOnNegativeComponent(false),
-	_cleanAreas(0)
+	_cleanMask(0)
 {
 }
 

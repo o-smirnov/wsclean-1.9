@@ -27,6 +27,7 @@
 
 #include "lofar/lmspredicter.h"
 #include "progressbar.h"
+#include "casamaskreader.h"
 
 #include <iostream>
 #include <memory>
@@ -34,9 +35,11 @@
 std::string commandLine;
 
 WSClean::WSClean() :
-	_imgWidth(2048), _imgHeight(2048), _channelsOut(1),
+	_imgWidth(2048), _imgHeight(2048),
+	_channelsOut(1), _intervalCount(1),
 	_pixelScaleX(0.01 * M_PI / 180.0), _pixelScaleY(0.01 * M_PI / 180.0),
 	_threshold(0.0), _gain(0.1), _mGain(1.0), _cleanBorderRatio(0.05),
+	_fitsMask(), _casaMask(),
 	_manualBeamMajorSize(0.0), _manualBeamMinorSize(0.0),
 	_manualBeamPA(0.0), _fittedBeam(false), _circularBeam(false),
 	_memFraction(1.0), _absMemLimit(0.0),
@@ -45,7 +48,7 @@ WSClean::WSClean() :
 	_nWLayers(0), _nIter(0), _antialiasingKernelSize(7), _overSamplingFactor(63),
 	_threadCount(sysconf(_SC_NPROCESSORS_ONLN)),
 	_globalSelection(),
-	_columnName(), _cleanAreasFilename(),
+	_columnName(),
 	_polarizations(),
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
@@ -58,9 +61,9 @@ WSClean::WSClean() :
 	_gridMode(LayeredImager::KaiserBessel),
 	_filenames(),
 	_commandLine(),
-	_inversionWatch(false), _predictingWatch(false), _cleaningWatch(false),
+	_inversionWatch(false), _predictingWatch(false), _deconvolutionWatch(false),
 	_isFirstInversion(true), _doReorder(false),
-	_majorIterationNr(0)
+	_currentIntervalIndex(0), _majorIterationNr(0)
 {
 	_polarizations.insert(Polarization::StokesI);
 }
@@ -608,14 +611,34 @@ void WSClean::initializeCleanAlgorithm()
 		_cleanAlgorithms[p]->SetThreadCount(_threadCount);
 		_cleanAlgorithms[p]->SetMultiscaleScaleBias(_multiscaleScaleBias);
 		_cleanAlgorithms[p]->SetMultiscaleThresholdBias(_multiscaleThresholdBias);
-		if(!_cleanAreasFilename.empty())
+		if(!_fitsMask.empty())
 		{
-			_cleanAreas.reset(new AreaSet());
-			AreaParser parser;
-			std::ifstream caFile(_cleanAreasFilename.c_str());
-			parser.Parse(*_cleanAreas, caFile);
-			_cleanAreas->SetImageProperties(_pixelScaleX, _pixelScaleY, _inversionAlgorithm->PhaseCentreRA(), _inversionAlgorithm->PhaseCentreDec(), _imgWidth, _imgHeight);
-			_cleanAlgorithms[p]->SetCleanAreas(*_cleanAreas);
+			if(_cleanMask.empty())
+			{
+				std::cout << "Reading mask '" << _fitsMask << "'...\n";
+				FitsReader maskReader(_fitsMask);
+				if(maskReader.ImageWidth() != _imgWidth || maskReader.ImageHeight() != _imgHeight)
+					throw std::runtime_error("Specified Fits file mask did not have same dimensions as output image!");
+				ao::uvector<float> maskData(_imgWidth*_imgHeight);
+				maskReader.Read(maskData.data());
+				_cleanMask.assign(_imgWidth*_imgHeight, false);
+				for(size_t i=0; i!=_imgWidth*_imgHeight; ++i)
+					_cleanMask[i] = maskData[i]!=0.0;
+			}
+			_cleanAlgorithms[p]->SetCleanMask(_cleanMask.data());
+		}
+		else if(!_casaMask.empty())
+		{
+			if(_cleanMask.empty())
+			{
+				std::cout << "Reading CASA mask '" << _casaMask << "'...\n";
+				_cleanMask.assign(_imgWidth*_imgHeight, false);
+				CasaMaskReader maskReader(_casaMask);
+				if(maskReader.Width() != _imgWidth || maskReader.Height() != _imgHeight)
+					throw std::runtime_error("Specified CASA mask did not have same dimensions as output image!");
+				maskReader.Read(_cleanMask.data());
+			}
+			_cleanAlgorithms[p]->SetCleanMask(_cleanMask.data());
 		}
 	}
 }
@@ -667,6 +690,7 @@ void WSClean::checkPolarizations()
 
 void WSClean::performReordering(bool isPredictMode)
 {
+	_partitionedMSHandles.clear();
 	for(std::vector<std::string>::const_iterator i=_filenames.begin(); i != _filenames.end(); ++i)
 	{
 		_partitionedMSHandles.push_back(PartitionedMS::Partition(*i, _channelsOut, _globalSelection, _columnName, true, _mGain != 1.0 || isPredictMode, _polarizations, _temporaryDirectory));
@@ -691,47 +715,54 @@ void WSClean::RunClean()
 
 	checkPolarizations();
 	
-	_doReorder = preferReordering();
+	MSSelection fullSelection = _globalSelection;
 	
-	if(_doReorder) performReordering(false);
-	
-	_firstMSBand = MultiBandData(casa::MeasurementSet(_filenames[0]).spectralWindow(), casa::MeasurementSet(_filenames[0]).dataDescription());
-	_weightPerChannel.assign(_channelsOut, 0);
-	
-	if(_mfsWeighting)
-		initializeMFSImageWeights();
-	
-	if(_joinedFrequencyCleaning)
+	for(_currentIntervalIndex=0; _currentIntervalIndex!=_intervalCount; ++_currentIntervalIndex)
 	{
-		// run all frequencies
-		runIndependentChannel(0);
-	}
-	else {
-		for(size_t outChannelIndex=0; outChannelIndex!=_channelsOut; ++outChannelIndex)
+		_globalSelection = selectInterval(fullSelection);
+		
+		_doReorder = preferReordering();
+		
+		if(_doReorder) performReordering(false);
+		
+		_firstMSBand = MultiBandData(casa::MeasurementSet(_filenames[0]).spectralWindow(), casa::MeasurementSet(_filenames[0]).dataDescription());
+		_weightPerChannel.assign(_channelsOut, 0);
+		
+		if(_mfsWeighting)
+			initializeMFSImageWeights();
+		
+		if(_joinedFrequencyCleaning)
 		{
-			runIndependentChannel(outChannelIndex);
+			// run all frequencies
+			runIndependentChannel(0);
 		}
-	}
-	
-	if(_channelsOut > 1)
-	{
-		for(std::set<PolarizationEnum>::const_iterator pol=_polarizations.begin(); pol!=_polarizations.end(); ++pol)
-		{
-			if(!(*pol == Polarization::YX && _polarizations.count(Polarization::XY)!=0))
+		else {
+			for(size_t outChannelIndex=0; outChannelIndex!=_channelsOut; ++outChannelIndex)
 			{
-				makeMFSImage("image.fits", *pol, false);
-				if(_nIter > 0)
+				runIndependentChannel(outChannelIndex);
+			}
+		}
+		
+		if(_channelsOut > 1)
+		{
+			for(std::set<PolarizationEnum>::const_iterator pol=_polarizations.begin(); pol!=_polarizations.end(); ++pol)
+			{
+				if(!(*pol == Polarization::YX && _polarizations.count(Polarization::XY)!=0))
 				{
-					makeMFSImage("residual.fits", *pol, false);
-					makeMFSImage("model.fits", *pol, false);
-				}
-				if(Polarization::IsComplex(*pol))
-				{
-					makeMFSImage("image.fits", *pol, true);
+					makeMFSImage("image.fits", *pol, false);
 					if(_nIter > 0)
 					{
-					  makeMFSImage("residual.fits", *pol, true);
-					  makeMFSImage("model.fits", *pol, true);
+						makeMFSImage("residual.fits", *pol, false);
+						makeMFSImage("model.fits", *pol, false);
+					}
+					if(Polarization::IsComplex(*pol))
+					{
+						makeMFSImage("image.fits", *pol, true);
+						if(_nIter > 0)
+						{
+							makeMFSImage("residual.fits", *pol, true);
+							makeMFSImage("model.fits", *pol, true);
+						}
 					}
 				}
 			}
@@ -750,15 +781,22 @@ void WSClean::RunPredict()
 	
 	checkPolarizations();
 	
-	_doReorder = preferReordering();
+	MSSelection fullSelection = _globalSelection;
 	
-	if(_doReorder) performReordering(true);
-	
-	_firstMSBand = MultiBandData(casa::MeasurementSet(_filenames[0]).spectralWindow(), casa::MeasurementSet(_filenames[0]).dataDescription());
-	
-	for(size_t outChannelIndex=0; outChannelIndex!=_channelsOut; ++outChannelIndex)
+	for(_currentIntervalIndex=0; _currentIntervalIndex!=_intervalCount; ++_currentIntervalIndex)
 	{
-		predictChannel(outChannelIndex);
+		_globalSelection = selectInterval(fullSelection);
+		
+		_doReorder = preferReordering();
+		
+		if(_doReorder) performReordering(true);
+		
+		_firstMSBand = MultiBandData(casa::MeasurementSet(_filenames[0]).spectralWindow(), casa::MeasurementSet(_filenames[0]).dataDescription());
+		
+		for(size_t outChannelIndex=0; outChannelIndex!=_channelsOut; ++outChannelIndex)
+		{
+			predictChannel(outChannelIndex);
+		}
 	}
 }
 
@@ -959,7 +997,7 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 	}
 	
 	_imageAllocator.ReportStatistics();
-	std::cout << "Inversion: " << _inversionWatch.ToString() << ", prediction: " << _predictingWatch.ToString() << ", cleaning: " << _cleaningWatch.ToString() << '\n';
+	std::cout << "Inversion: " << _inversionWatch.ToString() << ", prediction: " << _predictingWatch.ToString() << ", deconvolution: " << _deconvolutionWatch.ToString() << '\n';
 	
 	_prefixName = rootPrefix;
 	
@@ -1019,7 +1057,7 @@ void WSClean::predictChannel(size_t outChannelIndex)
 	} // end of polarization loop
 	
 	_imageAllocator.ReportStatistics();
-	std::cout << "Inversion: " << _inversionWatch.ToString() << ", prediction: " << _predictingWatch.ToString() << ", cleaning: " << _cleaningWatch.ToString() << '\n';
+	std::cout << "Inversion: " << _inversionWatch.ToString() << ", prediction: " << _predictingWatch.ToString() << ", cleaning: " << _deconvolutionWatch.ToString() << '\n';
 	
 	_prefixName = rootPrefix;
 	
@@ -1163,13 +1201,13 @@ void WSClean::performSimpleClean(CleanAlgorithm& cleanAlgorithm, size_t currentC
 	_modelImages.Load(modelImage.Data(), polarization, 0, false);
 	_psfImages.Load(psfImage, polarization, 0, false);
 	
-	_cleaningWatch.Start();
+	_deconvolutionWatch.Start();
 
 	std::vector<double*> psfs(1, psfImage);
 	TypedCleanAlgorithm<clean_algorithms::SingleImageSet>& tAlgorithm =
 		static_cast<TypedCleanAlgorithm<clean_algorithms::SingleImageSet>&>(cleanAlgorithm);
 	tAlgorithm.ExecuteMajorIteration(residualImage, modelImage, psfs, _imgWidth, _imgHeight, reachedMajorThreshold);
-	_cleaningWatch.Pause();
+	_deconvolutionWatch.Pause();
 	
 	_modelImages.Store(modelImage.Data(), polarization, 0, false);
 	_residualImages.Store(residualImage.Data(), polarization, 0, false);
@@ -1218,9 +1256,9 @@ void WSClean::performJoinedPolClean(size_t currentChannelIndex, bool& reachedMaj
 		residualSet.LoadLinear(_residualImages, 0);
 	}
 
-	_cleaningWatch.Start();
+	_deconvolutionWatch.Start();
 	static_cast<TypedCleanAlgorithm<clean_algorithms::PolarizedImageSet<PolCount>>&>(*_cleanAlgorithms[0]).ExecuteMajorIteration(residualSet, modelSet, psfImages, _imgWidth, _imgHeight, reachedMajorThreshold);
-	_cleaningWatch.Pause();
+	_deconvolutionWatch.Pause();
 	
 	_imageAllocator.Free(psfImage);
 	if(hasStokesPols)
@@ -1295,9 +1333,9 @@ void WSClean::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majo
 		}
 	}
 
-	_cleaningWatch.Start();
+	_deconvolutionWatch.Start();
 	static_cast<TypedCleanAlgorithm<clean_algorithms::MultiImageSet<clean_algorithms::PolarizedImageSet<PolCount>>>&>(*_cleanAlgorithms[0]).ExecuteMajorIteration(residualSet, modelSet, psfImages, _imgWidth, _imgHeight, reachedMajorThreshold);
-	_cleaningWatch.Pause();
+	_deconvolutionWatch.Pause();
 	
 	for(size_t ch=0; ch!=_channelsOut; ++ch)
 	{
@@ -1427,4 +1465,44 @@ void WSClean::writeFits(const string& suffix, const double* image, PolarizationE
 		updateCleanParameters(_fitsWriter, _cleanAlgorithms[polIndex]->IterationNumber(), _majorIterationNr);
 	}
 	_fitsWriter.Write(name, image);
+}
+
+MSSelection WSClean::selectInterval(MSSelection& fullSelection)
+{
+	if(_intervalCount == 1)
+		return fullSelection;
+	else {
+		size_t tS, tE;
+		if(fullSelection.HasInterval())
+		{
+			tS = fullSelection.IntervalStart();
+			tE = fullSelection.IntervalEnd();
+		}
+		else {
+			casa::MeasurementSet ms(_filenames[0]);
+			std::cout << "Counting number of scans... " << std::flush;
+			casa::ROScalarColumn<double> timeColumn(ms, casa::MS::columnName(casa::MSMainEnums::TIME));
+			double time = timeColumn(0);
+			size_t timestepIndex = 0;
+			for(size_t row = 0; row!=ms.nrow(); ++row)
+			{
+				if(time != timeColumn(row))
+				{
+					++timestepIndex;
+					time = timeColumn(row);
+				}
+			}
+			std::cout << "DONE (" << timestepIndex << ")\n";
+			tS = 0;
+			tE = timestepIndex;
+			// Store the full interval in the selection, so that it doesn't need to be determined again.
+			fullSelection.SetInterval(tS, tE);
+		}
+		MSSelection newSelection(fullSelection);
+		newSelection.SetInterval(
+			tS + (tE-tS) * _currentIntervalIndex / _intervalCount,
+			tS + (tE-tS) * (_currentIntervalIndex+1) / _intervalCount
+		);
+		return newSelection;
+	}
 }

@@ -238,10 +238,20 @@ void FitsWriter::julianDateToYMD(double jd, int &year, int &month, int &day) con
 
 void FitsWriter::mjdToHMS(double mjd, int& hour, int& minutes, int& seconds, int& deciSec) const
 {
-	hour = int(fmod(mjd * 24.0, 24.0));
-	minutes = int(fmod(mjd*60.0 * 24.0, 60.0));
-	seconds = int(fmod(mjd*3600.0 * 24.0, 60.0));
+	// It might seem you can calculate each of these immediately
+	// without adjusting 'mjd', but this way circumvents some
+	// catastrophic round problems, where "0:59.9" might end up
+	// as "1:59.9".
 	deciSec = int(fmod(mjd*36000.0 * 24.0, 10.0));
+	mjd -= double(deciSec)/(36000.0 * 24.0);
+	
+	seconds = int(round(fmod(mjd*3600.0 * 24.0, 60.0)));
+	mjd -= double(seconds)/(3600.0 * 24.0);
+	
+	minutes = int(round(fmod(mjd*60.0 * 24.0, 60.0)));
+	mjd -= double(minutes)/(60.0 * 24.0);
+	
+	hour = int(round(fmod(mjd * 24.0, 24.0)));
 }
 
 void FitsWriter::CopyDoubleKeywordIfExists(FitsReader& reader, const char* keywordName)

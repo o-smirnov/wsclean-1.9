@@ -178,23 +178,38 @@ void FitsReader::initialize()
 	if(equinox != 2000.0)
 		throw std::runtime_error("Invalid value for EQUINOX: "+readStringKey("EQUINOX"));
 	
-	if(readStringKey("CTYPE1") != "RA---SIN")
+	std::string tmp;
+	if(ReadStringKeyIfExists("CTYPE1", tmp) && tmp != "RA---SIN")
 		throw std::runtime_error("Invalid value for CTYPE1");
-	_phaseCentreRA = readDoubleKey("CRVAL1") * (M_PI / 180.0);
-	_pixelSizeX = readDoubleKey("CDELT1") * (-M_PI / 180.0);
-	if(readStringKey("CUNIT1") != "deg")
+	
+	_phaseCentreRA = 0.0;
+	ReadDoubleKeyIfExists("CRVAL1", _phaseCentreRA);
+	_phaseCentreRA *= M_PI / 180.0;
+	_pixelSizeX = 0.0;
+	ReadDoubleKeyIfExists("CDELT1", _pixelSizeX);
+	_pixelSizeX *= -M_PI / 180.0;
+	if(ReadStringKeyIfExists("CUNIT1", tmp) && tmp != "deg")
 		throw std::runtime_error("Invalid value for CUNIT1");
-	double centrePixelX = readDoubleKey("CRPIX1");
-	_phaseCentreDL = (centrePixelX - ((_imgWidth / 2.0)+1.0)) * _pixelSizeX;
+	double centrePixelX = 0.0;
+	if(ReadDoubleKeyIfExists("CRPIX1", centrePixelX))
+		_phaseCentreDL = (centrePixelX - ((_imgWidth / 2.0)+1.0)) * _pixelSizeX;
+	else
+		_phaseCentreDL = 0.0;
 
-	if(readStringKey("CTYPE2") != "DEC--SIN")
+	if(ReadStringKeyIfExists("CTYPE2",tmp) && tmp != "DEC--SIN")
 		throw std::runtime_error("Invalid value for CTYPE2");
-	_phaseCentreDec = readDoubleKey("CRVAL2") * (M_PI / 180.0);
-	_pixelSizeY = readDoubleKey("CDELT2") * (M_PI / 180.0);
-	if(readStringKey("CUNIT2") != "deg")
+	_phaseCentreDec = 0.0;
+	ReadDoubleKeyIfExists("CRVAL2", _phaseCentreDec);
+	_phaseCentreDec *= M_PI / 180.0;
+	ReadDoubleKeyIfExists("CDELT2", _pixelSizeY);
+	_pixelSizeY *= M_PI / 180.0;
+	if(ReadStringKeyIfExists("CUNIT2", tmp) && tmp != "deg")
 		throw std::runtime_error("Invalid value for CUNIT2");
-	double centrePixelY = readDoubleKey("CRPIX2");
-	_phaseCentreDM = ((_imgHeight / 2.0)+1.0 - centrePixelY) * _pixelSizeY;
+	double centrePixelY = 0.0;
+	if(ReadDoubleKeyIfExists("CRPIX1", centrePixelY))
+		_phaseCentreDM = ((_imgHeight / 2.0)+1.0 - centrePixelY) * _pixelSizeY;
+	else
+		_phaseCentreDM = 0.0;
 	
 	readDateKeyIfExists("DATE-OBS", _dateObs);
 	if(naxis >= 3)
@@ -249,6 +264,7 @@ void FitsReader::initialize()
 	readHistory();
 }
 
+template void FitsReader::Read(float* image);
 template void FitsReader::Read(double* image);
 
 template<typename NumType>
@@ -263,8 +279,10 @@ void FitsReader::Read(NumType* image)
 	
 	if(sizeof(NumType)==8)
 		fits_read_pix(_fitsPtr, TDOUBLE, &firstPixel[0], _imgWidth*_imgHeight, 0, image, 0, &status);
+	else if(sizeof(NumType)==4)
+		fits_read_pix(_fitsPtr, TFLOAT, &firstPixel[0], _imgWidth*_imgHeight, 0, image, 0, &status);
 	else
-		throw std::runtime_error("sizeof(NumType)!=8 not implemented");
+		throw std::runtime_error("sizeof(NumType)!=8 || 4 not implemented");
 	checkStatus(status, _filename);
 }
 

@@ -132,6 +132,50 @@ void JoinedClean<ImageSetType>::findPeak(const ImageSetType& image, size_t& x, s
 }
 
 template<typename ImageSetType>
+void JoinedClean<ImageSetType>::findPeak(const ImageSetType& image, size_t& x, size_t& y, size_t startY, size_t stopY, const bool* mask) const
+{
+	double peakMax = std::numeric_limits<double>::min();
+	size_t peakIndex = _width * _height;
+	
+	const size_t
+		horBorderSize = floor(_width*this->CleanBorderRatio()),
+		verBorderSize = floor(_height*this->CleanBorderRatio());
+	size_t xiStart = horBorderSize, xiEnd = _width - horBorderSize;
+	size_t yiStart = std::max(startY, verBorderSize), yiEnd = std::min(stopY, _height - verBorderSize);
+	if(xiEnd < xiStart) xiEnd = xiStart;
+	if(yiEnd < yiStart) yiEnd = yiStart;
+	for(size_t yi=yiStart; yi!=yiEnd; ++yi)
+	{
+		size_t index=yi*_width + xiStart;
+		for(size_t xi=xiStart; xi!=xiEnd; ++xi)
+		{
+			if(mask[index])
+			{
+				double value = image.AbsJoinedValue(index);
+				if(std::isfinite(value))
+				{
+					if(value > peakMax)
+					{
+						peakIndex = index;
+						peakMax = value;
+					}
+				}
+			}
+			++index;
+		}
+	}
+	if(peakIndex == _width * _height)
+	{
+		x = _width;
+		y = _height;
+	}
+	else {
+		x = peakIndex % _width;
+		y = peakIndex / _width;
+	}
+}
+
+template<typename ImageSetType>
 void JoinedClean<ImageSetType>::cleanThreadFunc(ao::lane<CleanTask> *taskLane, ao::lane<CleanResult> *resultLane, CleanThreadData cleanData)
 {
 	CleanTask task;
@@ -145,7 +189,10 @@ void JoinedClean<ImageSetType>::cleanThreadFunc(ao::lane<CleanTask> *taskLane, a
 		}
 		
 		CleanResult result;
-		findPeak(*cleanData.dataImage, result.nextPeakX, result.nextPeakY, cleanData.startY, cleanData.endY);
+		if(this->_cleanMask == 0)
+			findPeak(*cleanData.dataImage, result.nextPeakX, result.nextPeakY, cleanData.startY, cleanData.endY);
+		else
+			findPeak(*cleanData.dataImage, result.nextPeakX, result.nextPeakY, cleanData.startY, cleanData.endY, this->_cleanMask);
 		if(result.nextPeakX < _width)
 			result.peakLevelUnnormalized = cleanData.dataImage->AbsJoinedValue(result.nextPeakX + result.nextPeakY*_width);
 		else

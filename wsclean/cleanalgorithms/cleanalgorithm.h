@@ -42,7 +42,7 @@ public:
 	bool StopOnNegativeComponents() const { return _allowNegativeComponents; }
 	bool ResizePSF() const { return _resizePSF; }
 	
-	void SetCleanAreas(const class AreaSet& cleanAreas) { _cleanAreas = &cleanAreas; }
+	void SetCleanMask(const bool* cleanMask) { _cleanMask = cleanMask; }
 	
 	size_t IterationNumber() const { return _iterationNumber; }
 	
@@ -85,7 +85,7 @@ protected:
 	double _multiscaleThresholdBias, _multiscaleScaleBias;
 	size_t _maxIter, _iterationNumber, _threadCount;
 	bool _allowNegativeComponents, _stopOnNegativeComponent, _resizePSF;
-	const class AreaSet *_cleanAreas;
+	const bool* _cleanMask;
 };
 
 template<typename ImageSetType>

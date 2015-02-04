@@ -102,6 +102,8 @@ int main(int argc, char *argv[])
 			"-interval <start-index> <end-index>\n"
 			"   Only image the given time interval. Indices specify the timesteps, end index is exclusive.\n"
 			"   Default: image all time steps.\n"
+			"-intervalsout\n"
+			"   Number of intervals to image inside the selected global interval. Default: 1\n"
 			"-channelrange <start-channel> <end-channel>\n"
 			"   Only image the given channel range. Indices specify channel indices, end index is exclusive.\n"
 			"   Default: image all channels.\n"
@@ -121,7 +123,7 @@ int main(int argc, char *argv[])
 			"   Do not grid visibilities with a w-value higher than the given percentage of the max w, to save speed.\n"
 			"   Default: grid everything\n"
 			"\n"
-			"  ** CLEANING OPTIONS **\n"
+			"  ** DECONVOLUTION OPTIONS **\n"
 			"-niter <niter>\n"
 			"   Maximum number of clean iterations to perform. Default: 0\n"
 			"-threshold <threshold>\n"
@@ -150,6 +152,10 @@ int main(int argc, char *argv[])
 			"-cleanborder <percentage>\n"
 			"   Set the border size in which no cleaning is performed, in percentage of the width/height of the image.\n"
 			"   With an image size of 1000 and clean border of 1%, each border is 10 pixels. Default: 5 (%).\n"
+ 			"-fitsmask <mask>\n"
+			"   Use the specified fits-file as mask during cleaning.\n"
+			"-casamask <mask>\n"
+			"   Use the specified CASA mask as mask during cleaning.\n"
 			"-smallpsf\n"
 			"   Resize the psf to speed up minor clean iterations. Not the default.\n"
 			"-nonegative\n"
@@ -158,7 +164,7 @@ int main(int argc, char *argv[])
 			"   Default on: opposite of -nonegative.\n"
 			"-stopnegative\n"
 			"   Stop on negative components. Not the default.\n"
-			"-moresane <location>\n"
+			"-moresane-ext <location>\n"
 			"   Use the MoreSane deconvolution algorithm, installed at the specified location.\n"
 			"\n"
 			"  ** RESTORATION OPTIONS **\n"
@@ -265,7 +271,7 @@ int main(int argc, char *argv[])
 		{
 			wsclean.SetStopOnNegative(true);
 		}
-		else if(param == "moresane")
+		else if(param == "moresane-ext")
 		{
 			++argi;
 			wsclean.SetUseMoreSane(true);
@@ -289,8 +295,9 @@ int main(int argc, char *argv[])
 		}
 		else if(param == "cleanareas")
 		{
-			++argi;
-			wsclean.SetCleanAreasFilename(argv[argi]);
+			throw std::runtime_error("Clean areas is not supported ATM");
+			//++argi;
+			//wsclean.SetCleanAreasFilename(argv[argi]);
 		}
 		else if(param == "name")
 		{
@@ -325,6 +332,11 @@ int main(int argc, char *argv[])
 		{
 			wsclean.SetIntervalSelection(atoi(argv[argi+1]), atoi(argv[argi+2]));
 			argi += 2;
+		}
+		else if(param == "intervalsout")
+		{
+			++argi;
+			wsclean.SetIntervalCount(atoi(argv[argi]));
 		}
 		else if(param == "channelrange")
 		{
@@ -366,6 +378,16 @@ int main(int argc, char *argv[])
 		{
 			++argi;
 			wsclean.SetCleanBorderRatio(atof(argv[argi])*0.01);
+		}
+		else if(param == "fitsmask")
+		{
+			++argi;
+			wsclean.SetFitsMask(argv[argi]);
+		}
+		else if(param == "casamask")
+		{
+			++argi;
+			wsclean.SetCASAMask(argv[argi]);
 		}
 		else if(param == "nomfsweighting")
 		{

@@ -12,7 +12,7 @@
 #include <iostream>
 #include <limits>
 
-double SimpleClean::FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const class AreaSet &cleanAreas)
+double SimpleClean::FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const bool* cleanMask)
 {
 	double peakMax = std::numeric_limits<double>::min();
 	size_t index = 0;
@@ -21,13 +21,14 @@ double SimpleClean::FindPeak(const double *image, size_t width, size_t height, s
 	for(size_t yi=startY; yi!=endY; ++yi)
 	{
 		const double *imgIter = &image[yi*width];
+		const bool* cleanMaskPtr = &cleanMask[yi*width];
 		for(size_t xi=0; xi!=width; ++xi)
 		{
 			double value = *imgIter;
 			if(std::isfinite(value))
 			{
 				if(allowNegativeComponents) value = std::fabs(value);
-				if(value > peakMax && cleanAreas.AllowCleaningInImage(xi, yi))
+				if(value > peakMax && *cleanMaskPtr)
 				{
 					x = xi;
 					y = yi;
@@ -36,6 +37,7 @@ double SimpleClean::FindPeak(const double *image, size_t width, size_t height, s
 			}
 			++index;
 			++imgIter;
+			++cleanMaskPtr;
 		}
 	}
 	return image[x + y*width];
@@ -316,7 +318,9 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		_allowNegativeComponents = true;
 	
 	size_t componentX=0, componentY=0;
-	double peak = FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, CleanBorderRatio());
+	double peak = _cleanMask==0 ?
+		FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, CleanBorderRatio()) :
+		FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, _cleanMask);
 	std::cout << "Initial peak: " << peak << '\n';
 	double firstThreshold = _threshold, stopGainThreshold = fabs(peak*(1.0-_stopGain));
 	if(stopGainThreshold > firstThreshold)
@@ -398,10 +402,10 @@ void SimpleClean::cleanThreadFunc(ao::lane<CleanTask> *taskLane, ao::lane<CleanR
 		PartialSubtractImage(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, cleanData.psfImage, cleanData.psfWidth, cleanData.psfHeight, task.cleanCompX, task.cleanCompY, _subtractionGain * task.peakLevel, cleanData.startY, cleanData.endY);
 		
 		CleanResult result;
-		if(_cleanAreas == 0)
+		if(_cleanMask == 0)
 			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, CleanBorderRatio());
 		else
-			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, *_cleanAreas);
+			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, _cleanMask);
 		
 		resultLane->write(result);
 	}

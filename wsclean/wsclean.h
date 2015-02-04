@@ -27,13 +27,14 @@ public:
 	void SetCleanMGain(double mGain) { _mGain = mGain; }
 	void SetNIter(size_t nIter) { _nIter = nIter; }
 	void SetCleanBorderRatio(double borderRatio) { _cleanBorderRatio = borderRatio; }
+	void SetFitsMask(const std::string& fitsMask) { _fitsMask = fitsMask; }
+	void SetCASAMask(const std::string& casaMask) { _casaMask = casaMask; }
 	void SetThreshold(double threshold) { _threshold = threshold; }
 	void SetColumnName(const std::string& columnName) { _columnName = columnName; }
 	void SetPolarizations(const std::set<PolarizationEnum>& polarizations) { _polarizations = polarizations; }
 	void SetAllowNegative(bool allowNegative) { _allowNegative = allowNegative; }
 	void SetStopOnNegative(bool stopOnNegative) { _stopOnNegative = stopOnNegative; }
 	void SetMakePSF(bool makePSF) { _makePSF = makePSF; }
-	void SetCleanAreasFilename(const std::string& filename) { _cleanAreasFilename = filename; }
 	void SetPrefixName(const std::string& prefixName) { _prefixName = prefixName; }
 	void SetGridMode(LayeredImager::GridModeEnum gridMode) { _gridMode = gridMode; }
 	void SetSmallPSF(bool smallPSF) { _smallPSF = smallPSF; }
@@ -50,6 +51,7 @@ public:
 	void SetChannelsOut(size_t channelsOut) { _channelsOut = channelsOut; }
 	void SetJoinPolarizations(bool joinPolarizations) { _joinedPolarizationCleaning = joinPolarizations; }
 	void SetJoinChannels(bool joinChannels) { _joinedFrequencyCleaning = joinChannels; }
+	void SetIntervalCount(size_t intervalCount) { _intervalCount = intervalCount; }
 	void SetMultiscale(bool multiscale) { _multiscale = multiscale; }
 	void SetMultiscaleThresholdBias(double thresholdBias)
 	{ _multiscaleThresholdBias = thresholdBias; }
@@ -115,7 +117,7 @@ private:
 	
 	void initFitsWriter(class FitsWriter& writer);
 	void copyWSCleanKeywords(FitsReader& reader, FitsWriter& writer);
-	void copyDoubleKeywordIfExists(FitsReader& reader, FitsWriter& writer, const char* keywordName);
+	//void copyDoubleKeywordIfExists(FitsReader& reader, FitsWriter& writer, const char* keywordName);
 	void setCleanParameters(class FitsWriter& writer, const class CleanAlgorithm& clean);
 	void updateCleanParameters(class FitsWriter& writer, size_t minorIterationNr, size_t majorIterationNr);
 	void initializeWeightTapers();
@@ -128,6 +130,7 @@ private:
 	void clearCurMSProviders();
 	void storeAndCombineXYandYX(CachedImageSet& dest, PolarizationEnum polarization, size_t joinedChannelIndex, bool isImaginary, const double* image);
 	void selectChannels(MSSelection& selection, size_t outChannelIndex, size_t channelsOut);
+	MSSelection selectInterval(MSSelection& fullSelection);
 	
 	void imagePSF(size_t currentChannelIndex, size_t joinedChannelIndex);
 	void imageGridding();
@@ -139,18 +142,24 @@ private:
 	void makeMFSImage(const string& suffix, PolarizationEnum pol, bool isImaginary);
 	void writeFits(const string& suffix, const double* image, PolarizationEnum pol, size_t channelIndex, bool isImaginary);
 	
+	std::string fourDigitStr(size_t val) const
+	{
+		std::ostringstream str;
+		if(val < 1000) str << '0';
+		if(val < 100) str << '0';
+		if(val < 10) str << '0';
+		str << val;
+		return str.str();
+	}
+	
 	std::string getPSFPrefix(size_t channelIndex) const
 	{
 		std::ostringstream partPrefixNameStr;
 		partPrefixNameStr << _prefixName;
+		if(_intervalCount != 1)
+			partPrefixNameStr << "-t" << fourDigitStr(_currentIntervalIndex);
 		if(_channelsOut != 1)
-		{
-			partPrefixNameStr << '-';
-			if(channelIndex < 1000) partPrefixNameStr << '0';
-			if(channelIndex < 100) partPrefixNameStr << '0';
-			if(channelIndex < 10) partPrefixNameStr << '0';
-			partPrefixNameStr << channelIndex;
-		}
+			partPrefixNameStr << '-' << fourDigitStr(channelIndex);
 		return partPrefixNameStr.str();
 	}
 	
@@ -158,14 +167,10 @@ private:
 	{
 		std::ostringstream partPrefixNameStr;
 		partPrefixNameStr << _prefixName;
+		if(_intervalCount != 1)
+			partPrefixNameStr << "-t" << fourDigitStr(_currentIntervalIndex);
 		if(_channelsOut != 1)
-		{
-			partPrefixNameStr << '-';
-			if(channelIndex < 1000) partPrefixNameStr << '0';
-			if(channelIndex < 100) partPrefixNameStr << '0';
-			if(channelIndex < 10) partPrefixNameStr << '0';
-			partPrefixNameStr << channelIndex;
-		}
+			partPrefixNameStr << '-' << fourDigitStr(channelIndex);
 		if(_polarizations.size() != 1)
 		{
 			partPrefixNameStr << '-' << Polarization::TypeToShortString(polarization);
@@ -179,6 +184,8 @@ private:
 	{
 		std::ostringstream partPrefixNameStr;
 		partPrefixNameStr << _prefixName;
+		if(_intervalCount != 1)
+			partPrefixNameStr << "-t" << fourDigitStr(_currentIntervalIndex);
 		if(_channelsOut != 1)
 			partPrefixNameStr << "-MFS";
 		if(_polarizations.size() != 1)
@@ -195,14 +202,15 @@ private:
 		return ((_channelsOut != 1) || (_polarizations.size()>=4) || _forceReorder) && !_forceNoReorder;
 	}
 	
-	size_t _imgWidth, _imgHeight, _channelsOut;
+	size_t _imgWidth, _imgHeight, _channelsOut, _intervalCount;
 	double _pixelScaleX, _pixelScaleY, _threshold, _gain, _mGain, _cleanBorderRatio;
+	std::string _fitsMask, _casaMask;
 	double _manualBeamMajorSize, _manualBeamMinorSize, _manualBeamPA;
 	bool _fittedBeam, _circularBeam;
 	double _memFraction, _absMemLimit, _minUVInLambda, _maxUVInLambda, _wLimit, _multiscaleThresholdBias, _multiscaleScaleBias;
 	size_t _nWLayers, _nIter, _antialiasingKernelSize, _overSamplingFactor, _threadCount;
 	MSSelection _globalSelection, _currentPartSelection;
-	std::string _columnName, _cleanAreasFilename;
+	std::string _columnName;
 	std::set<PolarizationEnum> _polarizations;
 	WeightMode _weightMode;
 	std::string _prefixName;
@@ -217,11 +225,11 @@ private:
 	std::unique_ptr<class InversionAlgorithm> _inversionAlgorithm;
 	std::unique_ptr<class ImageWeights> _imageWeights;
 	std::vector<class CleanAlgorithm*> _cleanAlgorithms;
-	std::unique_ptr<class AreaSet> _cleanAreas;
+	ao::uvector<bool> _cleanMask;
 	ImageBufferAllocator<double> _imageAllocator;
-	Stopwatch _inversionWatch, _predictingWatch, _cleaningWatch;
+	Stopwatch _inversionWatch, _predictingWatch, _deconvolutionWatch;
 	bool _isFirstInversion, _doReorder;
-	size_t _majorIterationNr;
+	size_t _currentIntervalIndex, _majorIterationNr;
 	CachedImageSet _psfImages, _modelImages, _residualImages;
 	std::vector<PartitionedMS::Handle> _partitionedMSHandles;
 	FitsWriter _fitsWriter;

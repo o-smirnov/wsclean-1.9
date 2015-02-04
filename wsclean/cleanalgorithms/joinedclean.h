@@ -39,9 +39,13 @@ private:
 
 	void findPeak(const ImageSetType& image, size_t& x, size_t& y) const
 	{
-		findPeak(image, x, y, 0, _height);
+		if(this->_cleanMask == 0)
+			findPeak(image, x, y, 0, _height);
+		else
+			findPeak(image, x, y, 0, _height, this->_cleanMask);
 	}
 	void findPeak(const ImageSetType& image, size_t& x, size_t& y, size_t startY, size_t stopY) const;
+	void findPeak(const ImageSetType& image, size_t& x, size_t& y, size_t startY, size_t stopY, const bool* mask) const;
 	
 	std::string peakDescription(const ImageSetType& image, size_t& x, size_t& y);
 	void cleanThreadFunc(ao::lane<CleanTask>* taskLane, ao::lane<CleanResult>* resultLane, CleanThreadData cleanData);
