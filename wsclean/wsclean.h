@@ -220,7 +220,7 @@ private:
 	enum LayeredImager::GridModeEnum _gridMode;
 	std::vector<std::string> _filenames;
 	std::string _commandLine;
-	std::vector<size_t> _weightPerChannel;
+	std::vector<double> _weightPerChannel;
 	
 	std::unique_ptr<class InversionAlgorithm> _inversionAlgorithm;
 	std::unique_ptr<class ImageWeights> _imageWeights;

@@ -1413,7 +1413,10 @@ void WSClean::makeMFSImage(const string& suffix, PolarizationEnum pol, bool isIm
 		}
 		double weight;
 		if(!reader.ReadDoubleKeyIfExists("WSCIMGWG", weight))
+		{
+			std::cout << "Error: image " << name << " did not have the WSCIMGWG keyword.\n";
 			weight = 0.0;
+		}
 		weightSum += weight;
 		reader.Read(addedImage.data());
 		for(size_t i=0; i!=size; ++i)
