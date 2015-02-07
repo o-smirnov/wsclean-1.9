@@ -149,14 +149,14 @@ void DFTPredictionImage::FindComponents(DFTPredictionInput& destination, double 
 	}
 }
 
+struct ComponentInfo
+{
+	std::vector<size_t> count;
+	std::vector<MC2x2> beamValues;
+};
+	
 void DFTPredictionInput::ConvertApparentToAbsolute(casa::MeasurementSet& ms)
 {
-	struct ComponentInfo
-	{
-		std::vector<size_t> count;
-		std::vector<MC2x2> beamValues;
-	};
-	
 	std::vector<ComponentInfo> compInfos(_components.size());
 	
 	const BandData band(ms.spectralWindow());

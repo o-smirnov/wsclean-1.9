@@ -105,12 +105,12 @@ void WSInversion::initializeMeasurementSet(MSProvider& msProvider, WSInversion::
 	}
 	
 	casa::MSField fTable(ms.field());
-	casa::MDirection::ROScalarColumn refDirColumn(fTable, fTable.columnName(casa::MSFieldEnums::REFERENCE_DIR));
-	casa::MDirection refDir = refDirColumn(Selection().FieldId());
+	casa::MDirection::ROScalarColumn phaseDirColumn(fTable, fTable.columnName(casa::MSFieldEnums::PHASE_DIR));
+	casa::MDirection phaseDir = phaseDirColumn(Selection().FieldId());
 	casa::MEpoch curtime = timeColumn(0);
 	casa::MeasFrame frame(ant1Pos, curtime);
 	casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
-	casa::MDirection j2000 = casa::MDirection::Convert(refDir, j2000Ref)();
+	casa::MDirection j2000 = casa::MDirection::Convert(phaseDir, j2000Ref)();
 	casa::Vector<casa::Double> j2000Val = j2000.getValue().get();
 	_phaseCentreRA = j2000Val[0];
 	_phaseCentreDec = j2000Val[1];

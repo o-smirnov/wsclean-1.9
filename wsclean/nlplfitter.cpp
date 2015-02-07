@@ -11,6 +11,8 @@
 #include <gsl/gsl_multifit_nlin.h>
 #endif
 
+const double NLPLFact=1.0;
+
 class NLPLFitterData
 {
 public:
@@ -136,7 +138,7 @@ public:
 				y = fitterData.points[i].second;
 			
 			const double a_0 = gsl_vector_get(xvec, 0);
-			const double lg = log(x*1e-8);
+			const double lg = log(x*NLPLFact);
 			
 			double fity = a_0;
 			for(size_t j=1; j!=fitterData.nTerms; ++j)
@@ -162,7 +164,7 @@ public:
 				x = fitterData.points[i].first;
 			
 			const double a_0 = gsl_vector_get(xvec, 0);
-			const double lg = log(x*1e-8);
+			const double lg = log(x*NLPLFact);
 				
 			double fity = a_0;
 			for(size_t j=1; j!=fitterData.nTerms; ++j)
@@ -171,14 +173,12 @@ public:
 				fity += double(a_j) * pow(lg, j);
 			}
 			fity = exp(fity);
+			// dY/da_i = e^[ a_0...a_i-1,a_i+1...a_n] * (e^[a_i {log x}^i]) {log x}^i
 			gsl_matrix_set(J, i, 0, fity);
 			for(size_t j=1; j!=fitterData.nTerms; ++j)
 			{
-				const double a_j = gsl_vector_get(xvec, j);
-				const double dfda_j =
-					exp( pow(lg, j) * ( 1.0 - a_j ) );
-				//std::cout << dfda_j << " , ";
-				gsl_matrix_set(J, i, j, fity*dfda_j);
+				//const double a_j = gsl_vector_get(xvec, j);
+				gsl_matrix_set(J, i, j, fity*pow(lg, j));
 			}
 		}
 			
@@ -272,18 +272,9 @@ void NonLinearPowerLawFitter::Fit(double& a, double& b, double& c)
 	gsl_multifit_fdfsolver_free(_data->solver);
 }
 
-void NonLinearPowerLawFitter::Fit(std::vector<double>& terms, size_t nTerms)
+void NonLinearPowerLawFitter::fit_implementation(std::vector<double>& terms, size_t nTerms)
 {
-	terms.assign(nTerms, 0.0);
-	if(nTerms == 0)
-		return;
-	
-	double a, b;
-	Fit(a, b);
-	terms[0] = log(b) - a*log(1e-8);
-	if(nTerms > 1) terms[1] = a;
 	_data->nTerms = nTerms;
-	
 	const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
 	_data->solver = gsl_multifit_fdfsolver_alloc (T, _data->points.size(), nTerms);
 	
@@ -310,7 +301,7 @@ void NonLinearPowerLawFitter::Fit(std::vector<double>& terms, size_t nTerms)
 		status = gsl_multifit_test_delta(_data->solver->dx, _data->solver->x, 1e-6, 1e-6);
 		
   } while (status == GSL_CONTINUE && iter < 5000);
-	std::cout << iter << '\n';
+	std::cout << "niter=" << iter << ", status=" << gsl_strerror(status) << "\n";
 	
 	for(size_t i=0; i!=nTerms; ++i)
 		terms[i] = gsl_vector_get (_data->solver->x, i);
@@ -331,7 +322,7 @@ void NonLinearPowerLawFitter::Fit(double& a, double& b, double& c)
 	throw std::runtime_error("Non-linear power law fitter was invoked, but GSL was not found during compilation, and is required for this");
 }
 
-void NonLinearPowerLawFitter::Fit(std::vector<double>& terms, size_t nTerms)
+void NonLinearPowerLawFitter::fit_implementation(std::vector<double>& terms, size_t nTerms)
 {
 	throw std::runtime_error("Non-linear power law fitter was invoked, but GSL was not found during compilation, and is required for this");
 }
@@ -350,6 +341,38 @@ NonLinearPowerLawFitter::~NonLinearPowerLawFitter()
 void NonLinearPowerLawFitter::AddDataPoint(double x, double y)
 {
 	_data->points.push_back(std::make_pair(x, y));
+}
+
+void NonLinearPowerLawFitter::Fit(std::vector<double>& terms, size_t nTerms)
+{
+	terms.assign(nTerms, 0.0);
+	if(nTerms == 0)
+		return;
+	
+	double a, b;
+	Fit(a, b);
+	terms[0] = log(b) - a*log(NLPLFact);
+	if(nTerms > 1) terms[1] = a;
+	
+	fit_implementation(terms, nTerms);
+}
+
+void NonLinearPowerLawFitter::FitStable(std::vector<double>& terms, size_t nTerms)
+{
+	terms.assign(nTerms, 0.0);
+	if(nTerms == 0)
+		return;
+	
+	double a, b;
+	Fit(a, b);
+	terms[0] = log(b) - a*log(NLPLFact);
+	if(nTerms > 1) terms[1] = a;
+	size_t nTermsEstimated = 2;
+	while(nTermsEstimated < nTerms)
+	{
+		++nTermsEstimated;
+		fit_implementation(terms, nTermsEstimated);
+	}
 }
 
 void NonLinearPowerLawFitter::FastFit(double& exponent, double& factor)
@@ -401,7 +424,7 @@ double NonLinearPowerLawFitter::Evaluate(double x, const std::vector<double>& te
 {
 	if(terms.empty()) return 0.0;
 	double fity = terms[0];
-	const double lg = log(x*1e-8);
+	const double lg = log(x*NLPLFact);
 	for(size_t j=1; j!=terms.size(); ++j)
 	{
 		fity += terms[j] * pow(lg, j);
