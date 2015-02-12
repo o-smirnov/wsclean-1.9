@@ -5,9 +5,8 @@
 #include <string>
 #include <sstream>
 
-#include "sourcesdf.h"
-#include "sourcesdfwithsamples.h"
 #include "spectralenergydistribution.h"
+#include "measuredsed.h"
 
 #include "../radeccoord.h"
 #include "../imagecoordinates.h"
@@ -21,10 +20,36 @@ class ModelComponent
 		{
 		}
 		
+		ModelComponent(const ModelComponent& source) :
+		 _type(source._type),
+		 _posRA(source._posRA), _posDec(source._posDec),
+		 _sed(source._sed->Clone()),
+		 _l(source._l), _m(source._m),
+		 _positionAngle(source._positionAngle), _majorAxis(source._majorAxis), _minorAxis(source._minorAxis),
+			_userdata(source._userdata)
+		{
+		}
+		
+		ModelComponent& operator=(const ModelComponent& source)
+		{
+		 _type=source._type;
+		 _posRA=source._posRA; _posDec=source._posDec;
+		 _sed.reset(source._sed->Clone());
+		 _l=source._l; _m=source._m;
+		 _positionAngle=source._positionAngle; _majorAxis=source._majorAxis; _minorAxis=source._minorAxis;
+			_userdata=source._userdata;
+			return *this;
+		}
+		
 		enum Type Type() const { return _type; }
 		long double PosRA() const { return _posRA; }
 		long double PosDec() const { return _posDec; }
-		const SpectralEnergyDistribution &SED() const { return _sed; }
+		bool HasSED() const { return _sed != 0; }
+		SpectralEnergyDistribution &SED() { return *_sed; }
+		const SpectralEnergyDistribution &SED() const { return *_sed; }
+		bool HasMeasuredSED() const { return dynamic_cast<MeasuredSED*>(&*_sed)!=0; }
+		MeasuredSED& MSED() { return static_cast<MeasuredSED&>(*_sed); }
+		const MeasuredSED& MSED() const { return static_cast<const MeasuredSED&>(*_sed); }
 		long double L() const { return _l; }
 		long double M() const { return _m; }
 		long double PositionAngle() const { return _positionAngle; }
@@ -36,9 +61,8 @@ class ModelComponent
 		void SetType(enum Type type) { _type = type; }
 		void SetPosRA(long double posRA) { _posRA = posRA; }
 		void SetPosDec(long double posDec) { _posDec = posDec; }
-		SpectralEnergyDistribution &SED() { return _sed; }
-		void SetSED(const SpectralEnergyDistribution &sed) {
-			_sed = sed;
+		void SetSED(const SpectralEnergyDistribution& sed) {
+			_sed.reset(sed.Clone());
 		}
 		void SetL(long double l) { _l = l; }
 		void SetM(long double m) { _m = m; }
@@ -53,25 +77,25 @@ class ModelComponent
 			s << "  component {\n"
 				"    type point\n"
 				"    position " << RaDecCoord::RAToString(_posRA) << ' ' << RaDecCoord::DecToString(_posDec) << '\n' <<
-				_sed.ToString() << "  }\n";
+				_sed->ToString() << "  }\n";
 			return s.str();
 		}
 		
-		bool HasValidMeasurement() const { return _sed.HasValidMeasurement(); }
+		bool HasValidMeasurement() const { return HasMeasuredSED() && MSED().HasValidMeasurement(); }
 		
 		bool operator<(const ModelComponent& rhs) const
 		{
-			return _sed < rhs._sed;
+			return (*_sed) < (*rhs._sed);
 		}
 		
 		void operator*=(double factor)
 		{
-			_sed *= factor;
+			(*_sed) *= factor;
 		}
 	private:
 		enum Type _type;
 		long double _posRA, _posDec;
-		SpectralEnergyDistribution _sed;
+		std::unique_ptr<SpectralEnergyDistribution> _sed;
 		long double _l, _m;
 		long double _positionAngle, _majorAxis, _minorAxis;
 		void *_userdata;
@@ -159,7 +183,7 @@ class ModelSource
 			{
 				if(component.PosDec() == i->PosDec() && component.PosRA() == i->PosRA())
 				{
-					i->SED().CombineMeasurements(component.SED());
+					i->MSED().CombineMeasurements(component.MSED());
 					return;
 				}
 			}
@@ -208,10 +232,10 @@ class ModelSource
 		void *UserData() const { return _userdata; }
 		void SetUserData(void *userData) { _userdata = userData; }
 		
-		void MakeUnitFlux()
+		/*void MakeUnitFlux()
 		{
 			double totalFlux = 0.0;
-			double freq = (Peak().SED().LowestFrequency() + Peak().SED().HighestFrequency()) * 0.5;
+			double freq = (Peak().MSED().LowestFrequency() + Peak().MSED().HighestFrequency()) * 0.5;
 			for(iterator i=begin(); i!=end(); ++i)
 			{
 				totalFlux += TotalFlux(freq, Polarization::StokesI);
@@ -219,9 +243,9 @@ class ModelSource
 			for(iterator i=begin(); i!=end(); ++i)
 			{
 				double thisFlux = i->SED().FluxAtFrequency(freq, Polarization::StokesI);
-				i->SetSED(SpectralEnergyDistribution(thisFlux / totalFlux, freq));
+				i->SetSED(MeasuredSED(thisFlux / totalFlux, freq));
 			}
-		}
+		}*/
 		
 		void SetConstantTotalFlux(double newFlux, double frequency)
 		{
@@ -234,7 +258,7 @@ class ModelSource
 			for(iterator i=begin(); i!=end(); ++i)
 			{
 				double thisFlux = i->SED().FluxAtFrequency(frequency, Polarization::StokesI);
-				i->SetSED(SpectralEnergyDistribution(thisFlux * scaleFactor, frequency));
+				i->SetSED(MeasuredSED(thisFlux * scaleFactor, frequency));
 			}
 		}
 		
@@ -250,7 +274,7 @@ class ModelSource
 					m.SetFrequencyHz(frequency);
 					for(size_t p=0; p!=4; ++p)
 						m.SetFluxDensityFromIndex(p, newFluxes[p] / (double) ComponentCount());
-					SpectralEnergyDistribution sed;
+					MeasuredSED sed;
 					sed.AddMeasurement(m);
 					i->SetSED(sed);
 				}
@@ -271,7 +295,7 @@ class ModelSource
 					{
 						m.SetFluxDensityFromIndex(p, thisFlux * scaleFactor[p]);
 					}
-					SpectralEnergyDistribution sed;
+					MeasuredSED sed;
 					sed.AddMeasurement(m);
 					i->SetSED(sed);
 				}
@@ -307,18 +331,18 @@ class ModelSource
 			return false;
 		}
 		
-		SpectralEnergyDistribution GetIntegratedSED() const
+		MeasuredSED GetIntegratedMSED() const
 		{
 			if(_components.empty())
-				return SpectralEnergyDistribution();
+				return MeasuredSED();
 			const_iterator i=begin();
-			SpectralEnergyDistribution sum(i->SED());
+			MeasuredSED sum(i->MSED());
 			++i;
 			while(i != end())
 			{
-				const SpectralEnergyDistribution& sed = i->SED();
-				SpectralEnergyDistribution::const_iterator sedIter = sed.begin();
-				SpectralEnergyDistribution::iterator sumIter = sum.begin();
+				const MeasuredSED& sed = i->MSED();
+				MeasuredSED::const_iterator sedIter = sed.begin();
+				MeasuredSED::iterator sumIter = sum.begin();
 				while(sedIter != sed.end() && sumIter != sum.end())
 				{
 					double frequency = sumIter->second.FrequencyHz();

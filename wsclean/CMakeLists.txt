@@ -84,6 +84,9 @@ if(LANE11_COMPILES)
   add_definitions(-DHAVE_LANE11)
 endif(LANE11_COMPILES)
 
+# GSL is required for WSClean, so always available
+add_definitions(-DHAVE_GSL)
+
 # The following stuff will set the "rpath" correctly, so that
 # LD_LIBRARY_PATH doesn't have to be set.
 
@@ -102,7 +105,7 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_executable(wsclean wscleanmain.cpp wsclean.cpp casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/moresane.cpp cleanalgorithms/multiscaleclean.cpp cleanalgorithms/simpleclean.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp ${LBEAM_FILES})
+add_executable(wsclean wscleanmain.cpp wsclean.cpp casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/moresane.cpp cleanalgorithms/multiscaleclean.cpp cleanalgorithms/simpleclean.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp ${LBEAM_FILES})
 
 set_target_properties(wsclean PROPERTIES COMPILE_FLAGS "-std=c++0x")
 

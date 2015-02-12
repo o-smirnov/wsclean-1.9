@@ -11,8 +11,6 @@
 #include <gsl/gsl_multifit_nlin.h>
 #endif
 
-const double NLPLFact=1.0;
-
 class NLPLFitterData
 {
 public:
@@ -137,18 +135,18 @@ public:
 				x = fitterData.points[i].first,
 				y = fitterData.points[i].second;
 			
-			const double a_0 = gsl_vector_get(xvec, 0);
-			const double lg = log(x*NLPLFact);
+			const double lg = log10(x);
 			
-			double fity = a_0;
-			for(size_t j=1; j!=fitterData.nTerms; ++j)
+			// Horner's method
+			double fity = 0.0;
+			for(size_t k=0; k!=fitterData.nTerms; ++k)
 			{
+				size_t j = fitterData.nTerms-k-1;
 				const double a_j = gsl_vector_get(xvec, j);
-				fity += double(a_j) * pow(lg, j);
-				//std::cout << a_j << '{' << pow(lg, j) << "{";
+				fity = a_j + fity * lg;
 			}
 			//std::cout << x << ':' << fity << " / \n";
-			gsl_vector_set(f, i, exp(fity) - y);
+			gsl_vector_set(f, i, exp10(fity) - y);
 		}
 			
 		return GSL_SUCCESS;
@@ -163,22 +161,26 @@ public:
 			double
 				x = fitterData.points[i].first;
 			
-			const double a_0 = gsl_vector_get(xvec, 0);
-			const double lg = log(x*NLPLFact);
-				
-			double fity = a_0;
-			for(size_t j=1; j!=fitterData.nTerms; ++j)
+			const double lg = log10(x);
+			
+			// Horner's method
+			double fity = 0.0;
+			for(size_t k=0; k!=fitterData.nTerms; ++k)
 			{
+				size_t j = fitterData.nTerms-k-1;
 				const double a_j = gsl_vector_get(xvec, j);
-				fity += double(a_j) * pow(lg, j);
+				fity = a_j + fity * lg;
 			}
-			fity = exp(fity);
+			fity = exp10(fity);
 			// dY/da_i = e^[ a_0...a_i-1,a_i+1...a_n] * (e^[a_i {log x}^i]) {log x}^i
 			gsl_matrix_set(J, i, 0, fity);
+			
+			double lgPower = lg;
 			for(size_t j=1; j!=fitterData.nTerms; ++j)
 			{
 				//const double a_j = gsl_vector_get(xvec, j);
-				gsl_matrix_set(J, i, j, fity*pow(lg, j));
+				gsl_matrix_set(J, i, j, fity*lgPower);
+				lgPower *= lg;
 			}
 		}
 			
@@ -351,7 +353,7 @@ void NonLinearPowerLawFitter::Fit(std::vector<double>& terms, size_t nTerms)
 	
 	double a, b;
 	Fit(a, b);
-	terms[0] = log(b) - a*log(NLPLFact);
+	terms[0] = log10(b); // - a*log(NLPLFact);
 	if(nTerms > 1) terms[1] = a;
 	
 	fit_implementation(terms, nTerms);
@@ -365,7 +367,7 @@ void NonLinearPowerLawFitter::FitStable(std::vector<double>& terms, size_t nTerm
 	
 	double a, b;
 	Fit(a, b);
-	terms[0] = log(b) - a*log(NLPLFact);
+	terms[0] = log10(b); // - a*log(NLPLFact);
 	if(nTerms > 1) terms[1] = a;
 	size_t nTermsEstimated = 2;
 	while(nTermsEstimated < nTerms)
@@ -423,11 +425,12 @@ void NonLinearPowerLawFitter::FastFit(double& exponent, double& factor)
 double NonLinearPowerLawFitter::Evaluate(double x, const std::vector<double>& terms)
 {
 	if(terms.empty()) return 0.0;
-	double fity = terms[0];
-	const double lg = log(x*NLPLFact);
-	for(size_t j=1; j!=terms.size(); ++j)
+	double y = 0.0;
+	const double lg = log10(x);
+	for(size_t k=0; k!=terms.size(); ++k)
 	{
-		fity += terms[j] * pow(lg, j);
+		size_t j = terms.size()-k-1;
+		y = y * lg + terms[j];
 	}
-	return exp(fity);
+	return exp10(y);
 }

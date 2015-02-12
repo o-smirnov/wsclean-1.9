@@ -726,7 +726,7 @@ void WSClean::RunClean()
 		if(_doReorder) performReordering(false);
 		
 		_firstMSBand = MultiBandData(casa::MeasurementSet(_filenames[0]).spectralWindow(), casa::MeasurementSet(_filenames[0]).dataDescription());
-		_weightPerChannel.assign(_channelsOut, 0);
+		_infoPerChannel.assign(_channelsOut, ChannelInfo());
 		
 		if(_mfsWeighting)
 			initializeMFSImageWeights();
@@ -1111,7 +1111,9 @@ void WSClean::runFirstInversion(size_t currentChannelIndex, PolarizationEnum pol
 	
 	imageMainFirst(polarization, joinedChannelIndex);
 	
-	_weightPerChannel[currentChannelIndex] = _inversionAlgorithm->ImageWeight();
+	_infoPerChannel[currentChannelIndex].weight = _inversionAlgorithm->ImageWeight();
+	_infoPerChannel[currentChannelIndex].bandStart = _inversionAlgorithm->BandStart();
+	_infoPerChannel[currentChannelIndex].bandEnd = _inversionAlgorithm->BandEnd();
 	
 	if(_isGriddingImageSaved && firstBeforePSF && _inversionAlgorithm->HasGriddingCorrectionImage())
 		imageGridding();
@@ -1439,24 +1441,16 @@ void WSClean::makeMFSImage(const string& suffix, PolarizationEnum pol, bool isIm
 
 void WSClean::writeFits(const string& suffix, const double* image, PolarizationEnum pol, size_t channelIndex, bool isImaginary)
 {
-	double centreFrequency, bandwidth;
-	if(_firstMSBand.BandCount() == 1)
-	{
-		MSSelection selection(_globalSelection);
-		selectChannels(selection, channelIndex, _channelsOut);
-		BandData band(_firstMSBand.FirstBand(), selection.ChannelRangeStart(), selection.ChannelRangeEnd());
-		centreFrequency = band.CentreFrequency();
-		bandwidth = band.Bandwidth();
-	}
-	else {
-		centreFrequency = _firstMSBand.CentreFrequency();
-		bandwidth = _firstMSBand.Bandwidth();
-	}
+	const double
+		bandStart = _infoPerChannel[channelIndex].bandStart,
+		bandEnd = _infoPerChannel[channelIndex].bandEnd,
+		centreFrequency = 0.5*(bandStart+bandEnd),
+		bandwidth = bandEnd-bandStart;
 	const std::string name(getPrefix(pol, channelIndex, isImaginary) + '-' + suffix);
 	initFitsWriter(_fitsWriter);
 	_fitsWriter.SetPolarization(pol);
 	_fitsWriter.SetFrequency(centreFrequency, bandwidth);
-	_fitsWriter.SetExtraKeyword("WSCIMGWG", _weightPerChannel[channelIndex]);
+	_fitsWriter.SetExtraKeyword("WSCIMGWG", _infoPerChannel[channelIndex].weight);
 	size_t polIndex;
 	if(_joinedPolarizationCleaning)
 		polIndex = 0;

@@ -9,7 +9,7 @@
 #include <fstream>
 #include <stdexcept>
 
-Model::Model(const char *filename)
+void Model::read(const char* filename)
 {
 	ModelParser parser;
 	std::ifstream stream(filename);

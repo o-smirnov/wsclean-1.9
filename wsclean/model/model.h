@@ -24,7 +24,8 @@ class Model
 		{
 		}
 		
-		Model(const char *filename);
+		Model(const char *filename) { read(filename); }
+		Model(const std::string& filename) { read(filename.c_str()); }
 		
 		void operator=(const Model &source)
 		{
@@ -139,11 +140,14 @@ class Model
 			{
 				for(ModelSource::iterator compPtr = sourcePtr->begin(); compPtr != sourcePtr->end(); ++compPtr)
 				{
-					SpectralEnergyDistribution &sed = compPtr->SED();
-					for(SpectralEnergyDistribution::iterator m=sed.begin(); m!=sed.end(); ++m)
+					if(compPtr->HasMeasuredSED())
 					{
-						long double totalFlux = m->second.FluxDensity(Polarization::StokesI);
-						m->second.SetZeroExceptSinglePol(Polarization::StokesI, totalFlux);
+						MeasuredSED& sed = compPtr->MSED();
+						for(MeasuredSED::iterator m=sed.begin(); m!=sed.end(); ++m)
+						{
+							long double totalFlux = m->second.FluxDensity(Polarization::StokesI);
+							m->second.SetZeroExceptSinglePol(Polarization::StokesI, totalFlux);
+						}
 					}
 				}
 			}
@@ -170,6 +174,7 @@ class Model
 			std::sort(_sources.rbegin(), _sources.rend());
 		}
 	private:
+		void read(const char* filename);
 		enum PolarizationType _polarizationType;
 		std::vector<ModelSource> _sources;
 		std::map<std::string, ModelCluster> _clusters;

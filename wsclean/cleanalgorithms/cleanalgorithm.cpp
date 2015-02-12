@@ -40,7 +40,7 @@ void CleanAlgorithm::GetModelFromImage(Model &model, const double* image, size_t
 				ImageCoordinates::LMToRaDec<long double>(l, m, phaseCentreRA, phaseCentreDec, ra, dec);
 				std::stringstream nameStr;
 				nameStr << "component" << model.SourceCount();
-				component.SetSED(SpectralEnergyDistribution(value, refFreq, spectralIndex, polarization));
+				component.SetSED(MeasuredSED(value, refFreq, spectralIndex, polarization));
 				component.SetPosRA(ra);
 				component.SetPosDec(dec);
 				

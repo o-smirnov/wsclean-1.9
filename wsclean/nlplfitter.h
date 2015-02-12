@@ -34,12 +34,12 @@ public:
 	
 	static double Term0ToFactor(double term0, double term1)
 	{
-		return exp(term0 + term1*log(1e-8));
+		return exp10(term0); // + term1*log(NLPLFact));
 	}
 	
 	static double FactorToTerm0(double factor, double term1)
 	{
-		return log(factor) - (term1*log(1e-8));
+		return log10(factor); // - (term1*log(NLPLFact));
 	}
 	
 private:

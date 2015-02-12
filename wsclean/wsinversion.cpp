@@ -586,7 +586,10 @@ void WSInversion::Invert()
 			totalMatchingRows += msDataVector[i].matchingRows;
 		}
 		
-		std::cout << "Total rows read: " << totalRowsRead << " (overhead: " << round(totalRowsRead * 100.0 / totalMatchingRows - 100.0) << "%)\n";
+		std::cout << "Total rows read: " << totalRowsRead;
+		if(totalMatchingRows != 0)
+			std::cout << " (overhead: " << std::max(0.0, round(totalRowsRead * 100.0 / totalMatchingRows - 100.0)) << "%)";
+		std::cout << '\n';
 	}
 	
 	_imager->FinalizeImage(1.0/_totalWeight);
@@ -703,7 +706,10 @@ void WSInversion::Predict(double* real, double* imaginary)
 		totalMatchingRows += msDataVector[i].matchingRows;
 	}
 	
-	std::cout << "Total rows written: " << totalRowsWritten << " (overhead: " << round(totalRowsWritten * 100.0 / totalMatchingRows - 100.0) << "%)\n";
+	std::cout << "Total rows written: " << totalRowsWritten;
+	if(totalMatchingRows != 0)
+		std::cout << " (overhead: " << std::max(0.0, round(totalRowsWritten * 100.0 / totalMatchingRows - 100.0)) << "%)";
+	std::cout << '\n';
 	delete[] msDataVector;
 }
 
