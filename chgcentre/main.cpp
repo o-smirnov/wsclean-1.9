@@ -17,6 +17,8 @@
 #include <measures/Measures/Muvw.h>
 #include <measures/Measures/MeasConvert.h>
 
+#include <tables/Tables/TableRecord.h>
+
 #include "radeccoord.h"
 #include "banddata.h"
 #include "progressbar.h"
