@@ -134,12 +134,9 @@ class RaDecCoord
 			s << (char) ((hrsInt/10)+'0') << (char) ((hrsInt%10)+'0') << 'h'
 				<< (char) ((minInt/10)+'0') << (char) ((minInt%10)+'0') << 'm'
 				<< (char) ((secInt/10)+'0') << (char) ((secInt%10)+'0');
-			if(subSecInt!=0)
-			{
-				s << '.' << (char) (subSecInt/10+'0');
-				if(subSecInt%10!=0)
-					s << (char) (subSecInt%10+'0');
-			}
+			s << '.' << (char) (subSecInt/10+'0');
+			if(subSecInt%10!=0)
+				s << (char) (subSecInt%10+'0');
 			s << 's';
 			return s.str();
 		}
