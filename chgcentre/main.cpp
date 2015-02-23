@@ -16,6 +16,7 @@
 #include <measures/Measures/MPosition.h>
 #include <measures/Measures/Muvw.h>
 #include <measures/Measures/MeasConvert.h>
+#include <measures/Measures/MeasTable.h>
 
 #include <tables/Tables/TableRecord.h>
 
@@ -46,6 +47,27 @@ std::string dirToString(const MDirection &direction)
 	double ra = direction.getAngle().getValue()[0];
 	double dec = direction.getAngle().getValue()[1];
 	return RaDecCoord::RAToString(ra) + " " + RaDecCoord::DecToString(dec);
+}
+
+std::string posToString(const MPosition& position)
+{
+	double lon = position.getAngle().getValue()[0] * 180.0/M_PI;
+	double lat = position.getAngle().getValue()[1] * 180.0/M_PI;
+	std::stringstream str;
+	str << "Lon=" << lon << ", lat=" << lat << " in ";
+	switch(MPosition::castType(position.type()))
+	{
+		case MPosition::ITRF:
+			str << "ITRF";
+			break;
+		case MPosition::WGS84:
+			str << "WGS84";
+			break;
+		case MPosition::N_Types:
+			str << "N_Types";
+			break;
+	}
+	return str.str();
 }
 
 double length(const Muvw &uvw)
@@ -108,15 +130,51 @@ casa::MPosition ArrayCentroid(MeasurementSet& set)
 	return arrayPos;
 }
 
+casa::MPosition ArrayPosition(MeasurementSet& set, bool fallBackToCentroid=false)
+{
+	static bool hasArrayPos = false;
+	static MPosition arrayPos;
+	if(!hasArrayPos)
+	{
+		MSObservation obsTable(set.observation());
+		ROScalarColumn<String> telescopeNameColumn(obsTable, obsTable.columnName(casa::MSObservation::TELESCOPE_NAME));
+		bool hasTelescopeName = telescopeNameColumn.nrow()!=0;
+		bool hasObservatoryInfo = hasTelescopeName && MeasTable::Observatory(arrayPos, telescopeNameColumn(0));
+		if(!hasTelescopeName || !hasObservatoryInfo) {
+			if(!hasTelescopeName)
+				std::cout << "WARNING: This set did not specify an observatory name.\n";
+			else
+				std::cout << "WARNING: Set specifies '" << telescopeNameColumn(0) << "' as observatory name, but the array position of this telescope is unknown.\n";
+			
+			// If not found, use the position of the first antenna or array centroid if requested.
+			if(fallBackToCentroid)
+			{
+				arrayPos = ArrayCentroid(set);
+				std::cout << "Using antennae centroid as telescope centre: " << posToString(arrayPos) << '\n';
+			}
+			else {
+				arrayPos = antennas[0];
+				std::cout << "Using first antenna as telescope centre: " << posToString(arrayPos) << '\n';
+			}
+		}
+		else {
+			arrayPos = MPosition::Convert(arrayPos, MPosition::ITRF)();
+			std::cout << "Found '" << telescopeNameColumn(0) << "' array centre: " << posToString(arrayPos) << " (first antenna is at " << posToString(antennas[0]) << ").\n";
+		}
+		hasArrayPos = true;
+	}
+	return arrayPos;
+}
+
 MDirection ZenithDirection(MeasurementSet& set, size_t rowIndex)
 {
-	casa::MPosition arrayPos = ArrayCentroid(set);
+	casa::MPosition arrayPos = ArrayPosition(set);
 	casa::MEpoch::ROScalarColumn timeColumn(set, set.columnName(casa::MSMainEnums::TIME));
 	casa::MEpoch time = timeColumn(rowIndex);
 	casa::MeasFrame frame(arrayPos, time);
-	const casa::MDirection::Ref azelgeoRef(casa::MDirection::AZELGEO, frame);
+	const casa::MDirection::Ref azelRef(casa::MDirection::AZEL, frame);
 	const casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
-	casa::MDirection zenithAzEl(casa::MVDirection(0.0, 0.0, 1.0), azelgeoRef);
+	casa::MDirection zenithAzEl(casa::MVDirection(0.0, 0.0, 1.0), azelRef);
 	return casa::MDirection::Convert(zenithAzEl, j2000Ref)();
 }
 
@@ -143,8 +201,6 @@ void processField(
 	ROScalarColumn<casa::String> nameCol(fieldTable, fieldTable.columnName(MSFieldEnums::NAME));
 	MDirection::ArrayColumn phaseDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::PHASE_DIR));
 	MEpoch::ROScalarColumn timeCol(set, set.columnName(MSMainEnums::TIME));
-	MDirection::ArrayColumn delayDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::DELAY_DIR));
-	MDirection::ArrayColumn refDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::REFERENCE_DIR));
 	
 	ROScalarColumn<int>
 		antenna1Col(set, set.columnName(MSMainEnums::ANTENNA1)),
@@ -177,6 +233,7 @@ void processField(
 		}
 	}
 	
+	MPosition arrayPos = ArrayPosition(set);
 	Vector<MDirection> phaseDirVector = phaseDirCol(fieldIndex);
 	MDirection phaseDirection = phaseDirVector[0];
 	double oldRA = phaseDirection.getAngle().getValue()[0];
@@ -228,7 +285,7 @@ void processField(
 				{
 					time = rowTime;
 					for(size_t a=0; a!=antennas.size(); ++a)
-						uvws[a] = calculateUVW(antennas[a], antennas[0], time, refDirection);
+						uvws[a] = calculateUVW(antennas[a], arrayPos, time, refDirection);
 				}
 
 				// Calculate the new UVW
@@ -289,8 +346,6 @@ void processField(
 		
 		phaseDirVector[0] = newDirection;
 		phaseDirCol.put(fieldIndex, phaseDirVector);
-		delayDirCol.put(fieldIndex, phaseDirVector);
-		refDirCol.put(fieldIndex, phaseDirVector);
 		
 		if(shiftback)
 		{
@@ -319,8 +374,6 @@ void rotateToGeoZenith(
 	ROScalarColumn<casa::String> nameCol(fieldTable, fieldTable.columnName(MSFieldEnums::NAME));
 	MDirection::ArrayColumn phaseDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::PHASE_DIR));
 	MEpoch::ROScalarColumn timeCol(set, set.columnName(MSMainEnums::TIME));
-	MDirection::ArrayColumn delayDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::DELAY_DIR));
-	MDirection::ArrayColumn refDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::REFERENCE_DIR));
 	
 	ROScalarColumn<int>
 		antenna1Col(set, set.columnName(MSMainEnums::ANTENNA1)),
@@ -452,8 +505,6 @@ void rotateToGeoZenith(
 	
 	phaseDirVector[0] = ZenithDirection(set);
 	phaseDirCol.put(fieldIndex, phaseDirVector);
-	delayDirCol.put(fieldIndex, phaseDirVector);
-	refDirCol.put(fieldIndex, phaseDirVector);
 }
 
 void readAntennas(MeasurementSet &set, std::vector<MPosition> &antennas)
@@ -517,9 +568,8 @@ MDirection MinWDirection(MeasurementSet& set)
 	}
 }
 
-void printPhaseDir(const std::string &filename)
+void printPhaseDir(MeasurementSet& set)
 {
-	MeasurementSet set(filename);
 	MSField fieldTable = set.field();
 	MDirection::ROArrayColumn phaseDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::PHASE_DIR));
 	MDirection zenith = ZenithDirection(set);
@@ -588,10 +638,13 @@ int main(int argc, char **argv)
 			std::cout << "Missing parameter.\n";
 		else if(argi+1 == argc && !toZenith && !toMinW && !toGeozenith)
 		{
-			printPhaseDir(argv[argi]);
+			MeasurementSet set(argv[argi]);
+			readAntennas(set, antennas);
+			printPhaseDir(set);
 		}
 		else {
 			MeasurementSet set(argv[argi], Table::Update);
+			readAntennas(set, antennas);
 			MDirection newDirection;
 			if(toZenith)
 			{
@@ -606,8 +659,6 @@ int main(int argc, char **argv)
 				double newDec = RaDecCoord::ParseDec(argv[argi+2]);
 				newDirection = MDirection(MVDirection(newRA, newDec), MDirection::Ref(MDirection::J2000));
 			}
-			
-			readAntennas(set, antennas);
 			
 			MSField fieldTable = set.field();
 			for(unsigned fieldIndex=0; fieldIndex!=fieldTable.nrow(); ++fieldIndex)
