@@ -9,6 +9,9 @@
 
 class RaDecCoord
 {
+	private:
+		static bool isRASeparator(char c) { return c==':' || c==' '; }
+		static bool isDecSeparator(char c) { return c=='.' || c==' '; }
 	public:
 		static long double ParseRA(const std::string &str)
 		{
@@ -43,11 +46,11 @@ class RaDecCoord
 				} else throw std::runtime_error("Missing 'm'");
 			}
 			// Parse format '00:00:00.0'
-			else if(*cstr == ':')
+			else if(isRASeparator(*cstr))
 			{
 				++cstr;
 				mins = strtol(cstr, &cstr, 10);
-				if(*cstr == ':')
+				if(isRASeparator(*cstr))
 				{
 					++cstr;
 					secs = strtold(cstr, &cstr);
@@ -95,11 +98,11 @@ class RaDecCoord
 				} else throw std::runtime_error("Missing 'm'");
 			}
 			// Parse format '00.00.00.0'
-			else if(*cstr == '.')
+			else if(isDecSeparator(*cstr))
 			{
 				++cstr;
 				mins = strtol(cstr, &cstr, 10);
-				if(*cstr == '.')
+				if(isDecSeparator(*cstr))
 				{
 					++cstr;
 					secs = strtold(cstr, &cstr);
@@ -116,7 +119,7 @@ class RaDecCoord
 		
 		static std::string RAToString(long double ra)
 		{
-			long double hrs = ra * (12.0L / M_PIl);
+			long double hrs = fmodl(ra * (12.0L / M_PIl), 24.0L);
 			hrs = round(hrs * 60.0L*60.0L*10.0L)/(60.0L*60.0L*10.0L);
 			std::stringstream s;
 			if(hrs < 0) {
