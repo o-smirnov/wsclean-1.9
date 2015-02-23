@@ -54,19 +54,7 @@ std::string posToString(const MPosition& position)
 	double lon = position.getAngle().getValue()[0] * 180.0/M_PI;
 	double lat = position.getAngle().getValue()[1] * 180.0/M_PI;
 	std::stringstream str;
-	str << "Lon=" << lon << ", lat=" << lat << " in ";
-	switch(MPosition::castType(position.type()))
-	{
-		case MPosition::ITRF:
-			str << "ITRF";
-			break;
-		case MPosition::WGS84:
-			str << "WGS84";
-			break;
-		case MPosition::N_Types:
-			str << "N_Types";
-			break;
-	}
+	str << "Lon=" << lon << ", lat=" << lat;
 	return str.str();
 }
 
@@ -150,16 +138,16 @@ casa::MPosition ArrayPosition(MeasurementSet& set, bool fallBackToCentroid=false
 			if(fallBackToCentroid)
 			{
 				arrayPos = ArrayCentroid(set);
-				std::cout << "Using antennae centroid as telescope centre: " << posToString(arrayPos) << '\n';
+				std::cout << "Using antennae centroid as telescope position: " << posToString(arrayPos) << '\n';
 			}
 			else {
 				arrayPos = antennas[0];
-				std::cout << "Using first antenna as telescope centre: " << posToString(arrayPos) << '\n';
+				std::cout << "Using first antenna as telescope position: " << posToString(arrayPos) << '\n';
 			}
 		}
 		else {
 			arrayPos = MPosition::Convert(arrayPos, MPosition::ITRF)();
-			std::cout << "Found '" << telescopeNameColumn(0) << "' array centre: " << posToString(arrayPos) << " (first antenna is at " << posToString(antennas[0]) << ").\n";
+			//std::cout << "Found '" << telescopeNameColumn(0) << "' array centre: " << posToString(arrayPos) << " (first antenna is at " << posToString(antennas[0]) << ").\n";
 		}
 		hasArrayPos = true;
 	}
@@ -195,7 +183,7 @@ MDirection ZenithDirectionEnd(MeasurementSet& set)
 
 void processField(
 	MeasurementSet &set, int fieldIndex, MSField &fieldTable, const MDirection &newDirection,
-	bool onlyUVW, bool shiftback, bool flipUVWSign)
+	bool onlyUVW, bool shiftback, bool flipUVWSign, bool force)
 {
 	MultiBandData bandData(set.spectralWindow(), set.dataDescription());
 	ROScalarColumn<casa::String> nameCol(fieldTable, fieldTable.columnName(MSFieldEnums::NAME));
@@ -244,11 +232,14 @@ void processField(
 		<< dirToString(phaseDirection) << " -> "
 		<< dirToString(newDirection) << " ("
 		<< ImageCoordinates::AngularDistance(oldRA, oldDec, newRA, newDec)*(180.0/M_PI) << " deg)\n";
-	if(dirToString(phaseDirection) == dirToString(newDirection))
+	bool isSameDirection = (dirToString(phaseDirection) == dirToString(newDirection));
+	if(isSameDirection && !force)
 	{
 		std::cout << "Phase centre did not change: skipping field.\n";
 	}
 	else {
+		if(isSameDirection)
+			std::cout << "Phase centre not changed, but forcing update.\n";
 		double dl, dm;
 		ImageCoordinates::RaDecToLM(oldRA, oldDec, newRA, newDec, dl, dm);
 		
@@ -603,7 +594,7 @@ int main(int argc, char **argv)
 		int argi=1;
 		bool
 			toZenith = false, toMinW = false, onlyUVW = false,
-			shiftback = false, toGeozenith = false, flipUVWSign = false;
+			shiftback = false, toGeozenith = false, flipUVWSign = false, force = false;
 		while(argv[argi][0] == '-')
 		{
 			std::string param(&argv[argi][1]);
@@ -630,6 +621,10 @@ int main(int argc, char **argv)
 			else if(param == "flipuvwsign")
 			{
 				flipUVWSign = true;
+			}
+			else if(param == "f")
+			{
+				force = true;
 			}
 			else throw std::runtime_error("Invalid parameter");
 			++argi;
@@ -666,7 +661,7 @@ int main(int argc, char **argv)
 				if(toGeozenith)
 					rotateToGeoZenith(set, fieldIndex, fieldTable, onlyUVW);
 				else
-					processField(set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback, flipUVWSign);
+					processField(set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback, flipUVWSign, force);
 			}
 		}
 	}
