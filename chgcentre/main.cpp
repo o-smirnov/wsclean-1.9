@@ -654,7 +654,7 @@ int main(int argc, char **argv)
 		int argi=1;
 		bool
 			toZenith = false, toMinW = false, onlyUVW = false,
-			shiftback = false, toGeozenith = false, flipUVWSign = false, force = false, show = false;
+			shiftback = false, toGeozenith = false, flipUVWSign = false, force = false, show = false, same = false;
 		while(argv[argi][0] == '-')
 		{
 			std::string param(&argv[argi][1]);
@@ -690,6 +690,10 @@ int main(int argc, char **argv)
 			{
 				show = true;
 			}
+			else if(param == "same")
+			{
+				same = true;
+			}
 			else throw std::runtime_error("Invalid parameter");
 			++argi;
 		}
@@ -716,6 +720,12 @@ int main(int argc, char **argv)
 			else if(toMinW)
 			{
 				newDirection = MinWDirection(*set);
+			}
+			else if(same)
+			{
+				MDirection::ROArrayColumn phaseDirCol(set->field(), set->field().columnName(MSFieldEnums::PHASE_DIR));
+				Vector<MDirection> phaseDirVector = phaseDirCol(0);
+				newDirection = phaseDirVector[0];
 			}
 			else if(!toGeozenith) {
 				double newRA = RaDecCoord::ParseRA(argv[argi+1]);
