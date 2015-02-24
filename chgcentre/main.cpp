@@ -358,6 +358,66 @@ void processField(
 	}
 }
 
+void showChanges(
+	MeasurementSet &set, int fieldIndex, MSField &fieldTable, const MDirection &newDirection, bool flipUVWSign)
+{
+	ROScalarColumn<casa::String> nameCol(fieldTable, fieldTable.columnName(MSFieldEnums::NAME));
+	MDirection::ROArrayColumn phaseDirCol(fieldTable, fieldTable.columnName(MSFieldEnums::PHASE_DIR));
+	MEpoch::ROScalarColumn timeCol(set, set.columnName(MSMainEnums::TIME));
+	
+	ROScalarColumn<int>
+		antenna1Col(set, set.columnName(MSMainEnums::ANTENNA1)),
+		antenna2Col(set, set.columnName(MSMainEnums::ANTENNA2)),
+		fieldIdCol(set, set.columnName(MSMainEnums::FIELD_ID));
+	Muvw::ROScalarColumn
+		uvwCol(set, set.columnName(MSMainEnums::UVW));
+	
+	MPosition arrayPos = ArrayPosition(set);
+	Vector<MDirection> phaseDirVector = phaseDirCol(fieldIndex);
+	MDirection phaseDirection = phaseDirVector[0];
+	double oldRA = phaseDirection.getAngle().getValue()[0];
+	double oldDec = phaseDirection.getAngle().getValue()[1];
+	double newRA = newDirection.getAngle().getValue()[0];
+	double newDec = newDirection.getAngle().getValue()[1];
+	std::cout << "Showing UVWs for \"" << nameCol(fieldIndex) << "\": "
+		<< dirToString(phaseDirection) << " -> "
+		<< dirToString(newDirection) << " ("
+		<< ImageCoordinates::AngularDistance(oldRA, oldDec, newRA, newDec)*(180.0/M_PI) << " deg)\n";
+	
+	MDirection refDirection =
+		MDirection::Convert(newDirection,
+												MDirection::Ref(MDirection::J2000))();
+	std::vector<Muvw> uvws(antennas.size());
+	MEpoch time(MVEpoch(-1.0));
+	for(unsigned row=0; row!=std::min(set.nrow(),50u); ++row)
+	{
+		if(fieldIdCol(row) == fieldIndex)
+		{
+			// Read values from set
+			const int
+				antenna1 = antenna1Col(row),
+				antenna2 = antenna2Col(row);
+			const Muvw oldUVW = uvwCol(row);
+			
+			MEpoch rowTime = timeCol(row);
+			if(rowTime.getValue() != time.getValue())
+			{
+				time = rowTime;
+				for(size_t a=0; a!=antennas.size(); ++a)
+					uvws[a] = calculateUVW(antennas[a], arrayPos, time, refDirection);
+			}
+
+			// Calculate the new UVW
+			MVuvw newUVW = uvws[antenna1].getValue() - uvws[antenna2].getValue();
+			if(flipUVWSign)
+				newUVW = -newUVW;
+			
+			std::cout << "Old " << oldUVW << " (" << length(oldUVW) << ")\n";
+			std::cout << "New " << newUVW << " (" << length(newUVW) << ")\n\n";
+		}
+	}
+}
+
 void rotateToGeoZenith(
 	MeasurementSet &set, int fieldIndex, MSField &fieldTable, bool onlyUVW)
 {
@@ -594,7 +654,7 @@ int main(int argc, char **argv)
 		int argi=1;
 		bool
 			toZenith = false, toMinW = false, onlyUVW = false,
-			shiftback = false, toGeozenith = false, flipUVWSign = false, force = false;
+			shiftback = false, toGeozenith = false, flipUVWSign = false, force = false, show = false;
 		while(argv[argi][0] == '-')
 		{
 			std::string param(&argv[argi][1]);
@@ -626,6 +686,10 @@ int main(int argc, char **argv)
 			{
 				force = true;
 			}
+			else if(param == "show")
+			{
+				show = true;
+			}
 			else throw std::runtime_error("Invalid parameter");
 			++argi;
 		}
@@ -638,16 +702,20 @@ int main(int argc, char **argv)
 			printPhaseDir(set);
 		}
 		else {
-			MeasurementSet set(argv[argi], Table::Update);
-			readAntennas(set, antennas);
+			MeasurementSet *set;
+			if(show)
+				set = new MeasurementSet(argv[argi]);
+			else
+				set = new MeasurementSet(argv[argi], Table::Update);
+			readAntennas(*set, antennas);
 			MDirection newDirection;
 			if(toZenith)
 			{
-				newDirection = ZenithDirection(set);
+				newDirection = ZenithDirection(*set);
 			}
 			else if(toMinW)
 			{
-				newDirection = MinWDirection(set);
+				newDirection = MinWDirection(*set);
 			}
 			else if(!toGeozenith) {
 				double newRA = RaDecCoord::ParseRA(argv[argi+1]);
@@ -655,14 +723,17 @@ int main(int argc, char **argv)
 				newDirection = MDirection(MVDirection(newRA, newDec), MDirection::Ref(MDirection::J2000));
 			}
 			
-			MSField fieldTable = set.field();
+			MSField fieldTable = set->field();
 			for(unsigned fieldIndex=0; fieldIndex!=fieldTable.nrow(); ++fieldIndex)
 			{
-				if(toGeozenith)
-					rotateToGeoZenith(set, fieldIndex, fieldTable, onlyUVW);
+				if(show)
+					showChanges(*set, fieldIndex, fieldTable, newDirection, flipUVWSign);
+				else if(toGeozenith)
+					rotateToGeoZenith(*set, fieldIndex, fieldTable, onlyUVW);
 				else
-					processField(set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback, flipUVWSign, force);
+					processField(*set, fieldIndex, fieldTable, newDirection, onlyUVW, shiftback, flipUVWSign, force);
 			}
+			delete set;
 		}
 	}
 	
