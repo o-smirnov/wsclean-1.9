@@ -182,13 +182,13 @@ int main(int argc, char *argv[])
 			"   Set the FWHM beam shape for restoring the clean components. Defaults units for maj and min are arcsec, and\n"
 			"   degrees for PA. Can be overriden, e.g. '-beamshape 1amin 1amin 3deg'.\n"
 			"-fitbeam\n"
-			"   Determine beam shape by fitting the PSF.\n"
+			"   Determine beam shape by fitting the PSF (default if PSF is made).\n"
 			"-nofitbeam\n"
 			"   Determine beam shape from longest projected baseline.\n"
 			"-circularbeam\n"
 			"   Force the beam to be circular.\n"
 			"-ellipticalbeam\n"
-			"   Allow the beam to be elliptical. Default when -fitbeam is specified.\n";
+			"   Allow the beam to be elliptical. Default.\n";
 		return -1;
 	}
 	

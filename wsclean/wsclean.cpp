@@ -41,7 +41,7 @@ WSClean::WSClean() :
 	_threshold(0.0), _gain(0.1), _mGain(1.0), _cleanBorderRatio(0.05),
 	_fitsMask(), _casaMask(),
 	_manualBeamMajorSize(0.0), _manualBeamMinorSize(0.0),
-	_manualBeamPA(0.0), _fittedBeam(false), _circularBeam(false),
+	_manualBeamPA(0.0), _fittedBeam(true), _circularBeam(false),
 	_memFraction(1.0), _absMemLimit(0.0),
 	_minUVInLambda(0.0), _maxUVInLambda(0.0), _wLimit(0.0),
 	_multiscaleThresholdBias(0.7), _multiscaleScaleBias(0.6),
