@@ -200,38 +200,48 @@ public:
 #ifdef HAVE_GSL
 void NonLinearPowerLawFitter::Fit(double& exponent, double& factor)
 {
-	const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
-	_data->solver = gsl_multifit_fdfsolver_alloc (T, _data->points.size(), 2);
-	
-	gsl_multifit_function_fdf fdf;
-	fdf.f = &NLPLFitterData::fitting_func;
-	fdf.df = &NLPLFitterData::fitting_func_deriv;
-	fdf.fdf = &NLPLFitterData::fitting_func_both;
-	fdf.n = _data->points.size();
-	fdf.p = 2;
-	fdf.params = &*_data;
-	
-	double initialValsArray[2] = { exponent, factor };
-	gsl_vector_view initialVals = gsl_vector_view_array (initialValsArray, 2);
-	gsl_multifit_fdfsolver_set (_data->solver, &fdf, &initialVals.vector);
+	if(_data->points.size() >= 2)
+	{
+		const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
+		_data->solver = gsl_multifit_fdfsolver_alloc (T, _data->points.size(), 2);
+		
+		gsl_multifit_function_fdf fdf;
+		fdf.f = &NLPLFitterData::fitting_func;
+		fdf.df = &NLPLFitterData::fitting_func_deriv;
+		fdf.fdf = &NLPLFitterData::fitting_func_both;
+		fdf.n = _data->points.size();
+		fdf.p = 2;
+		fdf.params = &*_data;
+		
+		double initialValsArray[2] = { exponent, factor };
+		gsl_vector_view initialVals = gsl_vector_view_array (initialValsArray, 2);
+		gsl_multifit_fdfsolver_set (_data->solver, &fdf, &initialVals.vector);
 
-	int status;
-	size_t iter = 0;
-	do {
-		iter++;
-		status = gsl_multifit_fdfsolver_iterate (_data->solver);
+		int status;
+		size_t iter = 0;
+		do {
+			iter++;
+			status = gsl_multifit_fdfsolver_iterate (_data->solver);
+			
+			if(status)
+				break;
+			
+			status = gsl_multifit_test_delta(_data->solver->dx, _data->solver->x, 1e-7, 1e-7);
+			
+		} while (status == GSL_CONTINUE && iter < 500);
 		
-		if(status)
-			break;
+		exponent = gsl_vector_get (_data->solver->x, 0);
+		factor = gsl_vector_get (_data->solver->x, 1);
 		
-		status = gsl_multifit_test_delta(_data->solver->dx, _data->solver->x, 1e-7, 1e-7);
-		
-  } while (status == GSL_CONTINUE && iter < 500);
-	
-	exponent = gsl_vector_get (_data->solver->x, 0);
-	factor = gsl_vector_get (_data->solver->x, 1);
-	
-	gsl_multifit_fdfsolver_free(_data->solver);
+		gsl_multifit_fdfsolver_free(_data->solver);
+	}
+	else {
+		exponent = 0.0;
+		factor = 0.0;
+		for(size_t i=0; i!=_data->points.size(); ++i)
+			factor += _data->points[i].second;
+		factor /= double(_data->points.size());
+	}
 }
 
 void NonLinearPowerLawFitter::Fit(double& a, double& b, double& c)
@@ -239,39 +249,42 @@ void NonLinearPowerLawFitter::Fit(double& a, double& b, double& c)
 	Fit(a, b);
 	b = pow(b, 1.0/a);
 	
-	const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
-	_data->solver = gsl_multifit_fdfsolver_alloc (T, _data->points.size(), 3);
-	
-	gsl_multifit_function_fdf fdf;
-	fdf.f = &NLPLFitterData::fitting_2nd_order;
-	fdf.df = &NLPLFitterData::fitting_2nd_order_deriv;
-	fdf.fdf = &NLPLFitterData::fitting_2nd_order_both;
-	fdf.n = _data->points.size();
-	fdf.p = 3;
-	fdf.params = &*_data;
-	
-	double initialValsArray[3] = { a, b, c };
-	gsl_vector_view initialVals = gsl_vector_view_array(initialValsArray, 3);
-	gsl_multifit_fdfsolver_set(_data->solver, &fdf, &initialVals.vector);
+	if(_data->points.size() >= 3)
+	{
+		const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
+		_data->solver = gsl_multifit_fdfsolver_alloc (T, _data->points.size(), 3);
+		
+		gsl_multifit_function_fdf fdf;
+		fdf.f = &NLPLFitterData::fitting_2nd_order;
+		fdf.df = &NLPLFitterData::fitting_2nd_order_deriv;
+		fdf.fdf = &NLPLFitterData::fitting_2nd_order_both;
+		fdf.n = _data->points.size();
+		fdf.p = 3;
+		fdf.params = &*_data;
+		
+		double initialValsArray[3] = { a, b, c };
+		gsl_vector_view initialVals = gsl_vector_view_array(initialValsArray, 3);
+		gsl_multifit_fdfsolver_set(_data->solver, &fdf, &initialVals.vector);
 
-	int status;
-	size_t iter = 0;
-	do {
-		iter++;
-		status = gsl_multifit_fdfsolver_iterate (_data->solver);
+		int status;
+		size_t iter = 0;
+		do {
+			iter++;
+			status = gsl_multifit_fdfsolver_iterate (_data->solver);
+			
+			if(status)
+				break;
+			
+			status = gsl_multifit_test_delta(_data->solver->dx, _data->solver->x, 1e-7, 1e-7);
+			
+		} while (status == GSL_CONTINUE && iter < 500);
 		
-		if(status)
-			break;
+		a = gsl_vector_get (_data->solver->x, 0);
+		b = gsl_vector_get (_data->solver->x, 1);
+		c = gsl_vector_get (_data->solver->x, 2);
 		
-		status = gsl_multifit_test_delta(_data->solver->dx, _data->solver->x, 1e-7, 1e-7);
-		
-  } while (status == GSL_CONTINUE && iter < 500);
-	
-	a = gsl_vector_get (_data->solver->x, 0);
-	b = gsl_vector_get (_data->solver->x, 1);
-	c = gsl_vector_get (_data->solver->x, 2);
-	
-	gsl_multifit_fdfsolver_free(_data->solver);
+		gsl_multifit_fdfsolver_free(_data->solver);
+	}
 }
 
 void NonLinearPowerLawFitter::fit_implementation(std::vector<double>& terms, size_t nTerms)
@@ -348,6 +361,10 @@ void NonLinearPowerLawFitter::AddDataPoint(double x, double y)
 void NonLinearPowerLawFitter::Fit(std::vector<double>& terms, size_t nTerms)
 {
 	terms.assign(nTerms, 0.0);
+	
+	if(_data->points.size() < nTerms)
+		nTerms = _data->points.size();
+	
 	if(nTerms == 0)
 		return;
 	
@@ -416,7 +433,11 @@ void NonLinearPowerLawFitter::FastFit(double& exponent, double& factor)
 			factor = std::numeric_limits<double>::quiet_NaN();
 		}
 		else {
-			exponent = (n * sumxy - sumx * sumy) / (n * sumxx - sumx * sumx);
+			double d = (n * sumxx - sumx * sumx);
+			if(d == 0.0)
+				exponent = 0.0;
+			else
+				exponent = (n * sumxy - sumx * sumy) / d;
 			factor = std::exp((sumy - exponent * sumx) / n);
 		}
 	}

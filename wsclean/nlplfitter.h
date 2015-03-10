@@ -32,6 +32,11 @@ public:
 	
 	static double Evaluate(double x, const std::vector<double>& terms);
 	
+	static long double Evaluate(long double factor, long double exponent, long double frequencyHz)
+	{
+		return factor * powl(frequencyHz, exponent);
+	}
+		
 	static double Term0ToFactor(double term0, double term1)
 	{
 		return exp10(term0); // + term1*log(NLPLFact));

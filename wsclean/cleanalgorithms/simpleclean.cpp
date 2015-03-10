@@ -12,17 +12,64 @@
 #include <iostream>
 #include <limits>
 
-double SimpleClean::FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const bool* cleanMask)
+double SimpleClean::FindPeakSimple(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, double borderRatio)
 {
 	double peakMax = std::numeric_limits<double>::min();
-	size_t index = 0;
-	x = 0; y = startY;
+	size_t peakIndex = width * height;
+	
+	const size_t horBorderSize = round(width*borderRatio), verBorderSize = round(height*borderRatio);
+	size_t xiStart = horBorderSize, xiEnd = width - horBorderSize;
+	size_t yiStart = std::max(startY, verBorderSize), yiEnd = std::min(endY, height - verBorderSize);
+	if(xiEnd < xiStart) xiEnd = xiStart;
+	if(yiEnd < yiStart) yiEnd = yiStart;
+
+	for(size_t yi=yiStart; yi!=yiEnd; ++yi)
+	{
+		size_t index = yi*width + xiStart;
+		for(size_t xi=xiStart; xi!=xiEnd; ++xi)
+		{
+			double value = image[index];
+			if(std::isfinite(value))
+			{
+				if(allowNegativeComponents) value = std::fabs(value);
+				if(value > peakMax)
+				{
+					peakIndex = index;
+					peakMax = std::fabs(value);
+				}
+			}
+			++value;
+			++index;
+		}
+	}
+	if(peakIndex == width * height)
+	{
+		x = width; y = height;
+		return std::numeric_limits<double>::quiet_NaN();
+	}
+	else {
+		x = peakIndex % width;
+		y = peakIndex / width;
+		return image[x + y*width];
+	}
+}
+
+double SimpleClean::FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const bool* cleanMask, double borderRatio)
+{
+	double peakMax = std::numeric_limits<double>::min();
+	x = width; y = height;
+	
+	const size_t horBorderSize = round(width*borderRatio), verBorderSize = round(height*borderRatio);
+	size_t xiStart = horBorderSize, xiEnd = width - horBorderSize;
+	size_t yiStart = std::max(startY, verBorderSize), yiEnd = std::min(endY, height - verBorderSize);
+	if(xiEnd < xiStart) xiEnd = xiStart;
+	if(yiEnd < yiStart) yiEnd = yiStart;
 	
 	for(size_t yi=startY; yi!=endY; ++yi)
 	{
-		const double *imgIter = &image[yi*width];
-		const bool* cleanMaskPtr = &cleanMask[yi*width];
-		for(size_t xi=0; xi!=width; ++xi)
+		const double *imgIter = &image[yi*width+xiStart];
+		const bool* cleanMaskPtr = &cleanMask[yi*width+xiStart];
+		for(size_t xi=xiStart; xi!=xiEnd; ++xi)
 		{
 			double value = *imgIter;
 			if(std::isfinite(value))
@@ -35,12 +82,14 @@ double SimpleClean::FindPeak(const double *image, size_t width, size_t height, s
 					peakMax = std::fabs(value);
 				}
 			}
-			++index;
 			++imgIter;
 			++cleanMaskPtr;
 		}
 	}
-	return image[x + y*width];
+	if(y == height)
+		return std::numeric_limits<double>::quiet_NaN();
+	else
+		return image[x + y*width];
 }
 
 #if defined __AVX__ && !defined FORCE_NON_AVX
@@ -320,7 +369,7 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 	size_t componentX=0, componentY=0;
 	double peak = _cleanMask==0 ?
 		FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, CleanBorderRatio()) :
-		FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, _cleanMask);
+		FindPeak(dataImage, width, height, componentX, componentY, _allowNegativeComponents, 0, height, _cleanMask, CleanBorderRatio());
 	std::cout << "Initial peak: " << peak << '\n';
 	double firstThreshold = _threshold, stopGainThreshold = fabs(peak*(1.0-_stopGain));
 	if(stopGainThreshold > firstThreshold)
@@ -372,7 +421,7 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		{
 			CleanResult result;
 			resultLanes[i]->read(result);
-			if(fabs(result.peakLevel) >= fabs(peak))
+			if(std::isfinite(result.peakLevel) && fabs(result.peakLevel) >= fabs(peak))
 			{
 				peak = result.peakLevel;
 				componentX = result.nextPeakX;
@@ -405,7 +454,7 @@ void SimpleClean::cleanThreadFunc(ao::lane<CleanTask> *taskLane, ao::lane<CleanR
 		if(_cleanMask == 0)
 			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, CleanBorderRatio());
 		else
-			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, _cleanMask);
+			result.peakLevel = FindPeak(cleanData.dataImage, cleanData.imgWidth, cleanData.imgHeight, result.nextPeakX, result.nextPeakY, _allowNegativeComponents, cleanData.startY, cleanData.endY, _cleanMask, CleanBorderRatio());
 		
 		resultLane->write(result);
 	}

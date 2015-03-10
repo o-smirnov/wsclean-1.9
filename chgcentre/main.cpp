@@ -296,19 +296,19 @@ void processField(
 					progressBar->SetProgress(row, set.nrow());
 				}
 				
-				// Read the visibilities and phase-rotate them
-				double shiftFactor =
-					-2.0*M_PI* (newUVW.getVector()[2] - oldUVW.getValue().getVector()[2]);
-
-				if(shiftback)
-				{
-					double u = newUVW.getVector()[0], v = newUVW.getVector()[1];
-					shiftFactor +=
-						-2.0*M_PI* (u*dl + v*dm);
-				}
-				
 				if(!onlyUVW)
 				{
+					// Read the visibilities and phase-rotate them
+					double shiftFactor =
+						-2.0*M_PI* (newUVW.getVector()[2] - oldUVW.getValue().getVector()[2]);
+
+					if(shiftback)
+					{
+						double u = newUVW.getVector()[0], v = newUVW.getVector()[1];
+						shiftFactor +=
+							-2.0*M_PI* (u*dl + v*dm);
+					}
+					
 					const BandData& thisBand = bandData[dataDescId];
 					dataCol->get(row, *dataArray);
 					rotateVisibilities(thisBand, shiftFactor, polarizationCount, dataArray->cbegin());

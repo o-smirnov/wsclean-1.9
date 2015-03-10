@@ -41,7 +41,14 @@ int main(int argc, char *argv[])
 			"   be iterated several times, such as with many major iterations or in channel imaging mode.\n"
 			"   Default: only reorder when in channel imaging mode.\n"
 			"-tempdir <directory>\n"
-			"   Set the temporary direectory used when reordering files. Default: same directory as input measurement set.\n"
+			"   Set the temporary directory used when reordering files. Default: same directory as input measurement set.\n"
+			"-saveweights\n"
+			"   Save the gridded weights in the a fits file named <image-prefix>-weights.fits.\n"
+			"-update-model-required (default), and\n"
+			"-no-update-model-required\n"
+			"   These two options specify wether the model data column is required to\n"
+			"   contain valid model data after imaging. It can save time to not update\n"
+			"   the model data column.\n"
 			"\n"
 			"  ** INVERSION OPTIONS **\n"
 			"-name <image-prefix>\n"
@@ -168,8 +175,8 @@ int main(int argc, char *argv[])
 			"   Use the MoreSane deconvolution algorithm, installed at the specified location.\n"
 			"\n"
 			"  ** RESTORATION OPTIONS **\n"
-			"-beamsize <arcmin>\n"
-			"   Set the FWHM beam size in arcmin for restoring the clean components. Default: longest projected\n"
+			"-beamsize <arcsec>\n"
+			"   Set the FWHM beam size in arcsec for restoring the clean components. Default: longest projected\n"
 			"   baseline defines restoring beam.\n"
 			"-beamshape <maj in arcsec> <min in arcsec> <position angle in deg>\n"
 			"   Set the FWHM beam shape for restoring the clean components. Defaults units for maj and min are arcsec, and\n"
@@ -200,6 +207,10 @@ int main(int argc, char *argv[])
 		{
 			++argi;
 			wsclean.SetTemporaryDirectory(argv[argi]);
+		}
+		else if(param == "saveweights")
+		{
+			wsclean.SetSaveWeights(true);
 		}
 		else if(param == "predict")
 		{
@@ -473,6 +484,14 @@ int main(int argc, char *argv[])
 		{
 			wsclean.SetForceNoReorder(true);
 			wsclean.SetForceReorder(false);
+		}
+		else if(param == "update-model-required")
+		{
+			wsclean.SetModelUpdateRequired(true);
+		}
+		else if(param == "no-update-model-required")
+		{
+			wsclean.SetModelUpdateRequired(false);
 		}
 		else if(param == "j")
 		{

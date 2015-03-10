@@ -50,11 +50,11 @@ void ModelRenderer::Restore(NumType* imageData, size_t imageWidth, size_t imageH
 				yBottom = sourceY + boundingBoxSize;
 			if(xLeft < 0) xLeft = 0;
 			if(xLeft > (int) imageWidth) xLeft = (int) imageWidth;
-			if(xRight < 0) xRight = 0;
+			if(xRight < xLeft) xRight = xLeft;
 			if(xRight > (int) imageWidth) xRight = (int) imageWidth;
 			if(yTop < 0) yTop = 0;
 			if(yTop > (int) imageHeight) yTop = (int) imageHeight;
-			if(yBottom < 0) yBottom = 0;
+			if(yBottom < yTop) yBottom = yTop;
 			if(yBottom > (int) imageHeight) yBottom = (int) imageHeight;
 			
 			for(int y=yTop; y!=yBottom; ++y)
@@ -110,11 +110,11 @@ void ModelRenderer::Restore(NumType* imageData, size_t imageWidth, size_t imageH
 			const SpectralEnergyDistribution &sed = comp->SED();
 			const long double intFlux = sed.IntegratedFlux(startFrequency, endFrequency, polarization);
 			
-			//std::cout << "Source: " << comp->PosRA() << "," << comp->PosDec() << " Phase centre: " << _phaseCentreRA << "," << _phaseCentreDec << " beamsize: " << beamSize << "\n";
+			//std::cout << "Source: " << comp->PosRA() << "," << comp->PosDec() << " Phase centre: " << _phaseCentreRA << "," << _phaseCentreDec << " beammaj: " << beamMaj << "\n";
 				
 			int sourceX, sourceY;
 			ImageCoordinates::LMToXY<long double>(sourceL-_phaseCentreDL, sourceM-_phaseCentreDM, _pixelScaleL, _pixelScaleM, imageWidth, imageHeight, sourceX, sourceY);
-			//std::cout << "Adding source " << comp->Name() << " at " << sourceX << "," << sourceY << " of "
+			//std::cout << "Adding source " << src->Name() << " at " << sourceX << "," << sourceY << " of "
 			//	<< intFlux << " Jy ("
 			//	<< startFrequency/1000000.0 << "-" << endFrequency/1000000.0 << " MHz).\n";
 			int
@@ -124,11 +124,11 @@ void ModelRenderer::Restore(NumType* imageData, size_t imageWidth, size_t imageH
 				yBottom = sourceY + boundingBoxSize;
 			if(xLeft < 0) xLeft = 0;
 			if(xLeft > (int) imageWidth) xLeft = (int) imageWidth;
-			if(xRight < 0) xRight = 0;
+			if(xRight < xLeft) xRight = xLeft;
 			if(xRight > (int) imageWidth) xRight = (int) imageWidth;
 			if(yTop < 0) yTop = 0;
 			if(yTop > (int) imageHeight) yTop = (int) imageHeight;
-			if(yBottom < 0) yBottom = 0;
+			if(yBottom < yTop) yBottom = yTop;
 			if(yBottom > (int) imageHeight) yBottom = (int) imageHeight;
 			
 			for(int y=yTop; y!=yBottom; ++y)
@@ -143,7 +143,7 @@ void ModelRenderer::Restore(NumType* imageData, size_t imageWidth, size_t imageH
 						lTransf = (l-sourceL)*transf[0] + (m-sourceM)*transf[1],
 						mTransf = (l-sourceL)*transf[2] + (m-sourceM)*transf[3];
 					long double dist = sqrt(lTransf*lTransf + mTransf*mTransf);
-					long double g = gaus(dist, (long double) 1.0);
+					long double g = gaus(dist, 1.0L);
 					(*imageDataPtr) += NumType(g * intFlux);
 					++imageDataPtr;
 				}

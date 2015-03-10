@@ -247,7 +247,7 @@ string PartitionedMS::getMetaFilename(const string& msPathStr, const std::string
  * - Weights (single, only needed when imaging PSF)
  * - Model, optionally
  */
-PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t channelParts, MSSelection& selection, const string& dataColumnName, bool includeWeights, bool includeModel, const std::set<PolarizationEnum>& polsOut, const std::string& temporaryDirectory)
+PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t channelParts, MSSelection& selection, const string& dataColumnName, bool includeWeights, bool includeModel, bool modelUpdateRequired, const std::set<PolarizationEnum>& polsOut, const std::string& temporaryDirectory)
 {
 	casa::MeasurementSet ms(msPath);
 
@@ -457,7 +457,7 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 	}
 	progress2.reset();
 	
-	return Handle(metaFilename, msPath, dataColumnName, temporaryDirectory, channelParts, polsOut, selection);
+	return Handle(metaFilename, msPath, dataColumnName, temporaryDirectory, channelParts, modelUpdateRequired, polsOut, selection);
 }
 
 void PartitionedMS::unpartition(const PartitionedMS::Handle& handle)
@@ -585,7 +585,8 @@ void PartitionedMS::Handle::decrease()
 	--(_data->_referenceCount);
 	if(_data->_referenceCount == 0)
 	{
-		PartitionedMS::unpartition(*this);
+		if(_data->_modelUpdateRequired)
+			PartitionedMS::unpartition(*this);
 		
 		std::cout << "Cleaning up temporary files...\n";
 		

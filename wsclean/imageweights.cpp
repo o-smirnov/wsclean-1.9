@@ -3,6 +3,7 @@
 #include "multibanddata.h"
 
 #include "msproviders/msprovider.h"
+#include "fitswriter.h"
 
 #include <cmath>
 #include <iostream>
@@ -120,10 +121,9 @@ void ImageWeights::Grid(casa::MeasurementSet& ms, const MSSelection& selection)
 				double
 					u = uInM / curBand.ChannelWavelength(ch),
 					v = vInM / curBand.ChannelWavelength(ch);
-				double x = round(u*_imageWidth*_pixelScaleX + _imageWidth/2);
-				double y = round(v*_imageHeight*_pixelScaleY);
-					
-				if(x >= 0.0 && x < _imageWidth && y < _imageHeight/2)
+				int x, y;
+				uvToXY(u, v, x, y);
+				if(isWithinLimits(x, y))
 				{
 					for(size_t p=0; p!=polarizationCount; ++p)
 					{
@@ -183,10 +183,10 @@ void ImageWeights::Grid(MSProvider& msProvider, const MSSelection& selection)
 				double
 					u = uInM / curBand.ChannelWavelength(ch),
 					v = vInM / curBand.ChannelWavelength(ch);
-				double x = round(u*_imageWidth*_pixelScaleX + _imageWidth/2);
-				double y = round(v*_imageHeight*_pixelScaleY);
+				int x,y;
+				uvToXY(u, v, x, y);
 					
-				if(x >= 0.0 && x < _imageWidth && y < _imageHeight/2)
+				if(isWithinLimits(x, y))
 				{
 					size_t index = (size_t) x + (size_t) y*_imageWidth;
 					_grid[index] += *weightIter;
@@ -269,9 +269,9 @@ void ImageWeights::Grid(const std::complex<float> *data, const bool *flags, doub
 			}
 			
 			double wavelength = frequencyToWavelength(lowestFrequency + frequencyStep*ch);
-			double x = round(uTimesLambda*_imageWidth*_pixelScaleX/wavelength + _imageWidth/2);
-			double y = round(vTimesLambda*_imageHeight*_pixelScaleY/wavelength);
-			if(x >= 0.0 && x < _imageWidth && y < _imageHeight/2)
+			int x, y;
+			uvToXY(uTimesLambda/wavelength, vTimesLambda/wavelength, x, y);
+			if(isWithinLimits(x, y))
 			{
 				size_t index = (size_t) x + (size_t) y*_imageWidth;
 				_grid[index] += 1.0;
@@ -316,4 +316,26 @@ void ImageWeights::SetMaxUVRange(double maxUVInLambda)
 			++i;
 		}
 	}
+}
+
+void ImageWeights::Save(const string& filename)
+{
+	double* srcPtr = _grid.data();
+	ao::uvector<double> image(_imageWidth*_imageHeight);
+	for(size_t y=0; y!=_imageHeight/2; ++y)
+	{
+		size_t yUpper = _imageHeight/2 - 1 - y;
+		size_t yLower = _imageHeight/2 + y;
+		double* upperRow = &image[yUpper*_imageWidth];
+		double* lowerRow = &image[yLower*_imageWidth];
+		for(size_t x=0; x!=_imageWidth; ++x)
+		{
+			upperRow[_imageWidth-x-1] = *srcPtr;
+			lowerRow[x] = *srcPtr;
+			++srcPtr;
+		}
+	}
+	FitsWriter writer;
+	writer.SetImageDimensions(_imageWidth, _imageHeight);
+	writer.Write(filename, image.data());
 }

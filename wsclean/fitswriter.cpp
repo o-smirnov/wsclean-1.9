@@ -88,7 +88,7 @@ void FitsWriter::writeHeaders(fitsfile*& fptr, const std::string& filename, size
 	fits_write_key(fptr, TFLOAT, "CRPIX4", (void*) &one, "", &status); checkStatus(status, filename);
 	fits_write_key(fptr, TFLOAT, "CRVAL4", (void*) &pol, "", &status); checkStatus(status, filename);
 	fits_write_key(fptr, TFLOAT, "CDELT4", (void*) &one, "", &status); checkStatus(status, filename);
-	fits_write_key(fptr, TSTRING, "CUNIT4", (void*) "Hz", "", &status); checkStatus(status, filename);
+	fits_write_key(fptr, TSTRING, "CUNIT4", (void*) "", "", &status); checkStatus(status, filename);
 	
 	// RESTFRQ ?
 	fits_write_key(fptr, TSTRING, "SPECSYS", (void*) "TOPOCENT", "", &status); checkStatus(status, filename);

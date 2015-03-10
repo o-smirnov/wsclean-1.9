@@ -53,10 +53,12 @@ WSClean::WSClean() :
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
 	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false),
-	_useMoreSane(false), _makePSF(false), _isGriddingImageSaved(false),
+	_useMoreSane(false), _makePSF(false), _isWeightImageSaved(false), _isGriddingImageSaved(false),
 	_dftPrediction(false), _dftWithBeam(false),
 	_temporaryDirectory(),
-	_forceReorder(false), _forceNoReorder(false), _joinedPolarizationCleaning(false), _joinedFrequencyCleaning(false),
+	_forceReorder(false), _forceNoReorder(false),
+	_modelUpdateRequired(true),
+	_joinedPolarizationCleaning(false), _joinedFrequencyCleaning(false),
 	_mfsWeighting(false), _multiscale(false),
 	_gridMode(LayeredImager::KaiserBessel),
 	_filenames(),
@@ -468,6 +470,8 @@ void WSClean::initializeImageWeights(const MSSelection& partSelection)
 		}
 		_imageWeights->FinishGridding();
 		initializeWeightTapers();
+		if(_isWeightImageSaved)
+			_imageWeights->Save(_prefixName+"-weights.fits");
 		std::cout << "DONE\n";
 	}
 	_inversionAlgorithm->SetPrecalculatedWeightInfo(_imageWeights.get());
@@ -505,6 +509,8 @@ void WSClean::initializeMFSImageWeights()
 	}
 	_imageWeights->FinishGridding();
 	initializeWeightTapers();
+	if(_isWeightImageSaved)
+		_imageWeights->Save(_prefixName+"-weights.fits");
 }
 
 void WSClean::freeCleanAlgorithms()
@@ -693,7 +699,7 @@ void WSClean::performReordering(bool isPredictMode)
 	_partitionedMSHandles.clear();
 	for(std::vector<std::string>::const_iterator i=_filenames.begin(); i != _filenames.end(); ++i)
 	{
-		_partitionedMSHandles.push_back(PartitionedMS::Partition(*i, _channelsOut, _globalSelection, _columnName, true, _mGain != 1.0 || isPredictMode, _polarizations, _temporaryDirectory));
+		_partitionedMSHandles.push_back(PartitionedMS::Partition(*i, _channelsOut, _globalSelection, _columnName, true, _mGain != 1.0 || isPredictMode, _modelUpdateRequired, _polarizations, _temporaryDirectory));
 	}
 }
 

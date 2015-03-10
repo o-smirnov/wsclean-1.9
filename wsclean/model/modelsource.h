@@ -23,7 +23,7 @@ class ModelComponent
 		ModelComponent(const ModelComponent& source) :
 		 _type(source._type),
 		 _posRA(source._posRA), _posDec(source._posDec),
-		 _sed(source._sed->Clone()),
+		 _sed((source._sed == 0) ? 0 : source._sed->Clone()),
 		 _l(source._l), _m(source._m),
 		 _positionAngle(source._positionAngle), _majorAxis(source._majorAxis), _minorAxis(source._minorAxis),
 			_userdata(source._userdata)
@@ -32,11 +32,14 @@ class ModelComponent
 		
 		ModelComponent& operator=(const ModelComponent& source)
 		{
-		 _type=source._type;
-		 _posRA=source._posRA; _posDec=source._posDec;
-		 _sed.reset(source._sed->Clone());
-		 _l=source._l; _m=source._m;
-		 _positionAngle=source._positionAngle; _majorAxis=source._majorAxis; _minorAxis=source._minorAxis;
+			_type=source._type;
+			_posRA=source._posRA; _posDec=source._posDec;
+			if(source._sed == 0)
+				_sed.reset();
+			else
+				_sed.reset(source._sed->Clone());
+			_l=source._l; _m=source._m;
+			_positionAngle=source._positionAngle; _majorAxis=source._majorAxis; _minorAxis=source._minorAxis;
 			_userdata=source._userdata;
 			return *this;
 		}
@@ -228,6 +231,8 @@ class ModelSource
 		}
 		
 		size_t ComponentCount() const { return _components.size(); }
+		
+		const class ModelComponent& Component(size_t index) const { return _components[index]; }
 		
 		void *UserData() const { return _userdata; }
 		void SetUserData(void *userData) { _userdata = userData; }

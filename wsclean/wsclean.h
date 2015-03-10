@@ -78,6 +78,7 @@ public:
 	void SetTemporaryDirectory(const std::string& tempDir) { _temporaryDirectory = tempDir; }
 	void SetForceReorder(bool forceReorder) { _forceReorder = forceReorder; }
 	void SetForceNoReorder(bool forceNoReorder) { _forceNoReorder = forceNoReorder; }
+	void SetModelUpdateRequired(bool modelUpdateRequired) { _modelUpdateRequired = modelUpdateRequired; }
 	void SetMemFraction(double memFraction) { _memFraction = memFraction; }
 	void SetMemAbsLimit(double absMemLimit) { _absMemLimit = absMemLimit; }
 	void SetMinUVWInM(double minUVW) { _globalSelection.SetMinUVWInM(minUVW); }
@@ -86,6 +87,7 @@ public:
 	void SetMaxUVInLambda(double lambda) { _maxUVInLambda = lambda; }
 	void SetWLimit(double wLimit) { _wLimit = wLimit; }
 	void SetCommandLine(const std::string& cmdLine) { _commandLine = cmdLine; }
+	void SetSaveWeights(bool saveWeights) { _isWeightImageSaved = saveWeights; }
 	void SetSaveGriddingImage(bool isGriddingImageSaved) { _isGriddingImageSaved = isGriddingImageSaved; }
 	void SetDFTPrediction(bool dftPrediction) { _dftPrediction = dftPrediction; }
 	void SetDFTWithBeam(bool applyBeam) { _dftWithBeam = applyBeam; }
@@ -214,9 +216,9 @@ private:
 	std::set<PolarizationEnum> _polarizations;
 	WeightMode _weightMode;
 	std::string _prefixName;
-	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _useMoreSane, _makePSF, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
+	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _useMoreSane, _makePSF, _isWeightImageSaved, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
 	std::string _temporaryDirectory, _moreSaneLocation;
-	bool _forceReorder, _forceNoReorder, _joinedPolarizationCleaning, _joinedFrequencyCleaning, _mfsWeighting, _multiscale;
+	bool _forceReorder, _forceNoReorder, _modelUpdateRequired, _joinedPolarizationCleaning, _joinedFrequencyCleaning, _mfsWeighting, _multiscale;
 	enum LayeredImager::GridModeEnum _gridMode;
 	std::vector<std::string> _filenames;
 	std::string _commandLine;

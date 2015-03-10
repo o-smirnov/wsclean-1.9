@@ -19,16 +19,17 @@ public:
 	virtual std::string ToString() const
 	{
 		std::ostringstream str;
-		str << "PowerLawSED, reference frequency=" << _referenceFrequency*1e-6 << " MHz, brightness=["
-			<< _factors[0] << ", " << _factors[1] << ", " << _factors[2] << ", " << _factors[3]
-			<< "], SI terms: {";
-		if(!_terms.empty())
-		{
-			str << _terms[0];
-			for(size_t i=1; i!=_terms.size(); ++i)
-				str << ", " << _terms[i];
-		}
-		str << "}";
+		double f = NonLinearPowerLawFitter::Term0ToFactor(_terms[0], _terms[1]);
+		double
+			i=f*_factors[0], q=f*_factors[1],
+			u=f*_factors[2], v=f*_factors[3];
+		str << "    sed {\n      frequency " << _referenceFrequency*1e-6 << " MHz\n      fluxdensity Jy "
+			<< i << " " << q << " " << u << " " << v <<
+			"\n      spectral-index { ";
+		str << _terms[1];
+		for(size_t i=2; i!=_terms.size(); ++i)
+			str << ", " << _terms[i];
+		str << " }\n    }\n";
 		return str.str();
 	}
 	
@@ -70,6 +71,11 @@ public:
 		throw std::runtime_error("operator+= not yet implemented for power law sed");
 	}
 	
+	virtual long double ReferenceFrequencyHz() const
+	{
+		return _referenceFrequency;
+	}
+	
 	void SetData(double referenceFrequency, const double* brightnessVector, const std::vector<double>& siTerms)
 	{
 		_referenceFrequency = referenceFrequency;
@@ -82,7 +88,17 @@ public:
 			_terms[i+1] = siTerms[i];
 		for(size_t p=0; p!=4; ++p)
 			_factors[p] = brightnessVector[p] / refBrightness;
-		std::cout << ToString() << '\n';
+	}
+	
+	void GetData(double& referenceFrequency, double* brightnessVector, std::vector<double>& siTerms) const
+	{
+		referenceFrequency = _referenceFrequency;
+		double f = NonLinearPowerLawFitter::Term0ToFactor(_terms[0], _terms[1]);
+		for(size_t p=0; p!=4; ++p)
+			brightnessVector[p] = f*_factors[p];
+		siTerms.resize(_terms.size()-1);
+		for(size_t i=0; i!=_terms.size()-1; ++i)
+			siTerms[i] = _terms[i+1];
 	}
 private:
 	double _referenceFrequency;

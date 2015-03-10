@@ -17,48 +17,8 @@ namespace ao {
 class SimpleClean : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
 {
 	public:
-		static double FindPeakSimple(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, double borderRatio)
-		{
-			double peakMax = std::numeric_limits<double>::min();
-			size_t peakIndex = width * height;
-			
-			const size_t horBorderSize = round(width*borderRatio), verBorderSize = round(height*borderRatio);
-			size_t xiStart = horBorderSize, xiEnd = width - horBorderSize;
-			size_t yiStart = std::max(startY, verBorderSize), yiEnd = std::min(endY, height - verBorderSize);
-			if(xiEnd < xiStart) xiEnd = xiStart;
-			if(yiEnd < yiStart) yiEnd = yiStart;
-	
-			for(size_t yi=yiStart; yi!=yiEnd; ++yi)
-			{
-				size_t index = yi*width + xiStart;
-				for(size_t xi=xiStart; xi!=xiEnd; ++xi)
-				{
-					double value = image[index];
-					if(std::isfinite(value))
-					{
-						if(allowNegativeComponents) value = std::fabs(value);
-						if(value > peakMax)
-						{
-							peakIndex = index;
-							peakMax = std::fabs(value);
-						}
-					}
-					++value;
-					++index;
-				}
-			}
-			if(peakIndex == width * height)
-			{
-				x = width; y = height;
-				return std::numeric_limits<double>::quiet_NaN();
-			}
-			else {
-				x = peakIndex % width;
-				y = peakIndex / width;
-				return image[x + y*width];
-			}
-		}
-
+		static double FindPeakSimple(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, double borderRatio);
+		
 		static double FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, const bool* cleanMask);
 
 #if defined __AVX__ && !defined FORCE_NON_AVX
@@ -83,7 +43,7 @@ class SimpleClean : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
 		}
 #endif
 
-		static double FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const bool* cleanMask);
+		static double FindPeak(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, const bool* cleanMask, double borderRatio);
 		
 		static void SubtractImage(double *image, const double *psf, size_t width, size_t height, size_t x, size_t y, double factor);
 		

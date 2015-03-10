@@ -459,6 +459,12 @@ public:
 		fitter.Fit(terms, nTerms);
 	}
 	
+	virtual long double ReferenceFrequencyHz() const
+	{
+		return (_measurements.begin()->second.FrequencyHz() +
+			_measurements.rbegin()->second.FrequencyHz()) * 0.5;
+	}
+	
 	long double FluxAtLowestFrequency() const
 	{
 		const Measurement &m = _measurements.begin()->second;

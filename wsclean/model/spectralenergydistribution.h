@@ -28,6 +28,7 @@ public:
 	virtual bool operator<(const SpectralEnergyDistribution &other) const = 0;
 	virtual void operator*=(double factor) = 0;
 	virtual void operator+=(const SpectralEnergyDistribution &other) = 0;
+	virtual long double ReferenceFrequencyHz() const = 0;
 	
 	long double FluxAtFrequency(long double frequencyHz, PolarizationEnum polarization) const
 	{

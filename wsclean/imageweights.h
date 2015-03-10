@@ -51,6 +51,8 @@ class ImageWeights
 		
 		void SetMaxUVRange(double maxUVInLambda);
 		void SetMinUVRange(double minUVInLambda);
+		
+		void Save(const std::string& filename);
 	private:
 		ImageWeights(const ImageWeights&) :
 			_weightMode(WeightMode::NaturalWeighted),
@@ -62,15 +64,27 @@ class ImageWeights
 		{ }
 		void operator=(const ImageWeights&) { }
 		
-		double sampleGridValue(double u, double v) const
+		
+		void uvToXY(double u, double v, int& x, int& y) const
 		{
 			if(v < 0.0) {
 				u = -u;
 				v = -v;
 			}
-			double x = round(u*_imageWidth*_pixelScaleX + _imageWidth/2);
-			double y = round(v*_imageHeight*_pixelScaleY);
-			if(x >= 0.0 && x < _imageWidth && y < _imageHeight/2)
+			x = int(floor(u*_imageWidth*_pixelScaleX + _imageWidth/2));
+			y = int(floor(v*_imageHeight*_pixelScaleY));
+		}
+		
+		bool isWithinLimits(int x, int y) const
+		{		
+			return x >= 0 && x < int(_imageWidth) && y < int(_imageHeight/2);
+		}
+		
+		double sampleGridValue(double u, double v) const
+		{
+			int x,y;
+			uvToXY(u, v, x, y);
+			if(isWithinLimits(x, y))
 				return _grid[(size_t) x + (size_t) y*_imageWidth];
 			else {
 				return 0.0;

@@ -41,12 +41,15 @@ void Model::Optimize()
 
 void Model::add(const ModelSource& source)
 {
-	for(iterator i = begin(); i!=end(); ++i)
+	if(source.ComponentCount()!=0)
 	{
-		if(source.Peak().PosDec() == i->Peak().PosDec() && source.Peak().PosRA() == i->Peak().PosRA())
+		for(iterator i = begin(); i!=end(); ++i)
 		{
-			(*i) += source;
-			return;
+			if(i->ComponentCount()!=0 && source.Peak().PosDec() == i->Peak().PosDec() && source.Peak().PosRA() == i->Peak().PosRA())
+			{
+				(*i) += source;
+				return;
+			}
 		}
 	}
 	_sources.push_back(source);
@@ -54,12 +57,15 @@ void Model::add(const ModelSource& source)
 
 void Model::addOptimized(const ModelSource& source)
 {
-	for(iterator i = begin(); i!=end(); ++i)
+	if(source.ComponentCount()!=0)
 	{
-		if(source.Peak().PosDec() == i->Peak().PosDec() && source.Peak().PosRA() == i->Peak().PosRA())
+		for(iterator i = begin(); i!=end(); ++i)
 		{
-			/* merge */
-			return;
+			if(i->ComponentCount()!=0 && source.Peak().PosDec() == i->Peak().PosDec() && source.Peak().PosRA() == i->Peak().PosRA())
+			{
+				/* merge */
+				return;
+			}
 		}
 	}
 	_sources.push_back(source);
