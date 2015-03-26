@@ -6,7 +6,11 @@
 
 #include <iostream>
 
+#ifdef WSCLEAN_NO_MAIN
+int wsclean_main(int argc, char *argv[])
+#else
 int main(int argc, char *argv[])
+#endif
 {
 	std::cout << "\n"
 		"WSClean version " WSCLEAN_VERSION_STR " (" WSCLEAN_VERSION_DATE ")\n"
@@ -44,6 +48,9 @@ int main(int argc, char *argv[])
 			"   Set the temporary directory used when reordering files. Default: same directory as input measurement set.\n"
 			"-saveweights\n"
 			"   Save the gridded weights in the a fits file named <image-prefix>-weights.fits.\n"
+			"-saveuv\n"
+			"   Save the gridded uv plane, i.e., the FFT of the residual image. The UV plane is complex, hence\n"
+			"   two images will be output: <prefix>-uv-real.fits and <prefix>-uv-imag.fits.\n"
 			"-update-model-required (default), and\n"
 			"-no-update-model-required\n"
 			"   These two options specify wether the model data column is required to\n"
@@ -80,6 +87,9 @@ int main(int argc, char *argv[])
 			"   Default: off, unless -joinchannels is specified.\n"
 			"-nomfsweighting\n"
 			"   Opposite of -mfsweighting; can be used to turn off MFS weighting in -joinchannels mode.\n"
+			"-weightingrankfilter <level>\n"
+			"   Filter the weights and set high weights to the local mean. The level parameter specifies\n"
+			"   the filter level; any value larger than level*localmean will be set to level*localmean.\n"
 			"-gridmode <nn or kb>\n"
 			"   Kernel and mode used for gridding: kb = Kaiser-Bessel (default with 7 pixels), nn = nearest\n"
 			"   neighbour (no kernel). Default: kb.\n"
@@ -211,6 +221,10 @@ int main(int argc, char *argv[])
 		else if(param == "saveweights")
 		{
 			wsclean.SetSaveWeights(true);
+		}
+		else if(param == "saveuv")
+		{
+			wsclean.SetSaveUV(true);
 		}
 		else if(param == "predict")
 		{
@@ -384,6 +398,11 @@ int main(int argc, char *argv[])
 		{
 			++argi;
 			wsclean.SetMultiscaleScaleBias(atof(argv[argi]));
+		}
+		else if(param == "weightingrankfilter")
+		{
+			++argi;
+			wsclean.SetRankFilterLevel(atof(argv[argi]));
 		}
 		else if(param == "cleanborder")
 		{
@@ -559,4 +578,5 @@ int main(int argc, char *argv[])
 		wsclean.RunPredict();
 	else
 		wsclean.RunClean();
+	return 0;
 }

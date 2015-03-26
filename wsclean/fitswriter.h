@@ -85,6 +85,13 @@ class FitsWriter : protected FitsIOChecker
 			_width = width;
 			_height = height;
 		}
+		void SetImageDimensions(size_t width, size_t height, double pixelSizeX, double pixelSizeY)
+		{
+			_width = width;
+			_height = height;
+			_pixelSizeX = pixelSizeX;
+			_pixelSizeY = pixelSizeY;
+		}
 		void SetImageDimensions(size_t width, size_t height, double phaseCentreRA, double phaseCentreDec, double pixelSizeX, double pixelSizeY)
 		{
 			_width = width;

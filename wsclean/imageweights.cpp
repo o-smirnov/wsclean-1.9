@@ -339,3 +339,63 @@ void ImageWeights::Save(const string& filename)
 	writer.SetImageDimensions(_imageWidth, _imageHeight);
 	writer.Write(filename, image.data());
 }
+
+void ImageWeights::RankFilter(double rankLimit, size_t windowSize)
+{
+	ao::uvector<double> newGrid(_grid);
+	for(size_t y=0; y!=_imageHeight/2; ++y)
+	{
+		for(size_t x=0; x!=_imageWidth; ++x)
+		{
+			double w = _grid[y*_imageWidth + x];
+			if(w != 0.0)
+			{
+				double mean = windowMean(x, y, windowSize);
+				if(w > mean*rankLimit)
+					newGrid[y*_imageWidth + x] = mean*rankLimit;
+			}
+		}
+	}
+	_grid = newGrid;
+}
+
+double ImageWeights::windowMean(size_t x, size_t y, size_t windowSize)
+{
+	size_t d = windowSize/2;
+	size_t x1, y1, x2, y2;
+	if(x <= d)
+		x1 = 0;
+	else
+		x1 = x - d;
+	
+	if(y <= d)
+		y1 = 0;
+	else
+		y1 = y - d;
+	
+	if(x+d >= _imageWidth)
+		x2 = _imageWidth;
+	else
+		x2 = x + d;
+	
+	if(y+d >= _imageHeight/2)
+		y2 = _imageHeight/2;
+	else
+		y2 = y + d;
+	
+	size_t windowCount = 0;
+	double windowSum = 0.0;
+	for(size_t yi=y1; yi<y2; ++yi)
+	{
+		for(size_t xi=x1; xi<x2; ++xi)
+		{
+			double w = _grid[yi*_imageWidth + xi];
+			if(w != 0.0)
+			{
+				++windowCount;
+				windowSum += w;
+			}
+		}
+	}
+	return windowSum / double(windowCount);
+}

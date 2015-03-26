@@ -88,11 +88,13 @@ public:
 	void SetWLimit(double wLimit) { _wLimit = wLimit; }
 	void SetCommandLine(const std::string& cmdLine) { _commandLine = cmdLine; }
 	void SetSaveWeights(bool saveWeights) { _isWeightImageSaved = saveWeights; }
+	void SetSaveUV(bool saveUV) { _isUVImageSaved = saveUV; }
 	void SetSaveGriddingImage(bool isGriddingImageSaved) { _isGriddingImageSaved = isGriddingImageSaved; }
 	void SetDFTPrediction(bool dftPrediction) { _dftPrediction = dftPrediction; }
 	void SetDFTWithBeam(bool applyBeam) { _dftWithBeam = applyBeam; }
 	void SetUseMoreSane(bool useMoreSane) { _useMoreSane = useMoreSane; }
 	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
+	void SetRankFilterLevel(double level) { _rankFilterLevel = level; }
 	
 	void AddInputMS(const std::string& msPath) { _filenames.push_back(msPath); }
 	
@@ -143,6 +145,7 @@ private:
 	
 	void makeMFSImage(const string& suffix, PolarizationEnum pol, bool isImaginary);
 	void writeFits(const string& suffix, const double* image, PolarizationEnum pol, size_t channelIndex, bool isImaginary);
+	void saveUVImage(const double* image, PolarizationEnum pol, size_t channelIndex, bool isImaginary, const std::string& prefix);
 	
 	std::string fourDigitStr(size_t val) const
 	{
@@ -209,14 +212,14 @@ private:
 	std::string _fitsMask, _casaMask;
 	double _manualBeamMajorSize, _manualBeamMinorSize, _manualBeamPA;
 	bool _fittedBeam, _circularBeam;
-	double _memFraction, _absMemLimit, _minUVInLambda, _maxUVInLambda, _wLimit, _multiscaleThresholdBias, _multiscaleScaleBias;
+	double _memFraction, _absMemLimit, _minUVInLambda, _maxUVInLambda, _wLimit, _multiscaleThresholdBias, _multiscaleScaleBias, _rankFilterLevel;
 	size_t _nWLayers, _nIter, _antialiasingKernelSize, _overSamplingFactor, _threadCount;
 	MSSelection _globalSelection, _currentPartSelection;
 	std::string _columnName;
 	std::set<PolarizationEnum> _polarizations;
 	WeightMode _weightMode;
 	std::string _prefixName;
-	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _useMoreSane, _makePSF, _isWeightImageSaved, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
+	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _useMoreSane, _makePSF, _isWeightImageSaved, _isUVImageSaved, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
 	std::string _temporaryDirectory, _moreSaneLocation;
 	bool _forceReorder, _forceNoReorder, _modelUpdateRequired, _joinedPolarizationCleaning, _joinedFrequencyCleaning, _mfsWeighting, _multiscale;
 	enum LayeredImager::GridModeEnum _gridMode;

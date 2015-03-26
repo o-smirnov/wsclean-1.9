@@ -333,6 +333,7 @@ void WSInversion::gridMeasurementSet(MSData &msData)
 			{
 				case WeightMode::UniformWeighted:
 				case WeightMode::BriggsWeighted:
+				case WeightMode::NaturalWeighted:
 				{
 					std::complex<float>* dataIter = newItem.data;
 					float* weightIter = weightBuffer.data();
@@ -345,15 +346,6 @@ void WSInversion::gridMeasurementSet(MSData &msData)
 						*dataIter *= weight;
 						_totalWeight += weight * *weightIter;
 						++dataIter;
-						++weightIter;
-					}
-				} break;
-				case WeightMode::NaturalWeighted:
-				{
-					float* weightIter = weightBuffer.data();
-					for(size_t ch=0; ch!=curBand.ChannelCount(); ++ch)
-					{
-						_totalWeight += *weightIter;
 						++weightIter;
 					}
 				} break;

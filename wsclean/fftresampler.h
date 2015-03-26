@@ -52,6 +52,8 @@ public:
 		_tasks.clear();
 	}
 	
+	void SingleFT(const double* input, double* realOutput, double* imaginaryOutput);
+	
 private:
 	void runThread();
 	

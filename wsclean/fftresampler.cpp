@@ -1,4 +1,5 @@
 #include "fftresampler.h"
+#include "uvector.h"
 
 #include <complex>
 #include <iostream>
@@ -85,7 +86,7 @@ void FFTResampler::runThread()
 				//if((x == 0 && newY == 0) || (x==minMidX-1 && y==minHeight-1))
 				//	std::cout << newfftData[newIndex] << " (" << oldX << " , " << oldY << ") - (" << newX << " , " << newY << ")\n";
 			}
-			if(_inputWidth > _outputWidth)
+			if(_inputWidth >= _outputWidth)
 			{
 				size_t oldIndex = _inputWidth/2 + oldY * (oldMidX+1);
 				size_t newIndex = _outputWidth/2 + newY * (newMidX+1);
@@ -101,4 +102,68 @@ void FFTResampler::runThread()
 		
 		fftw_free(newfftData);
 	}
+}
+
+void FFTResampler::SingleFT(const double* input, double* realOutput, double* imaginaryOutput)
+{
+	ao::uvector<double> data(_inputWidth*_inputHeight);
+	size_t
+		halfWidth = _inputWidth/2,
+		halfHeight = _inputHeight/2;
+	for(size_t y=0; y!=_inputHeight; ++y)
+	{
+		size_t yIn = y + halfHeight;
+		if(yIn >= _inputHeight) yIn -= _inputHeight;
+		double* rowOutPtr = &data[y*_inputWidth];
+		const double* rowInPtr = &input[yIn*_inputWidth];
+		for(size_t x=0; x!=_inputWidth; ++x)
+		{
+			size_t xIn = x + halfWidth;
+			if(xIn >= _inputWidth) xIn -= _inputWidth;
+			if(std::isfinite(rowInPtr[xIn]))
+				rowOutPtr[x] = rowInPtr[xIn];
+			else
+				rowOutPtr[x] = 0.0;
+		}
+	}
+	
+	size_t fftInWidth = _inputWidth/2+1;
+	std::complex<double>
+		*fftData = reinterpret_cast<std::complex<double>*>(fftw_malloc(fftInWidth*_inputHeight*sizeof(std::complex<double>)));
+	if(_verbose)
+		std::cout << "FFT " << _inputWidth << " x " << _inputHeight << " real -> complex...\n";
+	fftw_execute_dft_r2c(_inToFPlan, data.data(), reinterpret_cast<fftw_complex*>(fftData));
+	
+	size_t midX = _inputWidth/2;
+	size_t midY = _inputHeight/2;
+	
+	double factor = 1.0 / sqrt(_inputWidth*_inputHeight);
+	
+	for(size_t y=0; y!=_inputHeight; ++y)
+	{
+		size_t oldY = y+midY;
+		if(oldY >= _inputHeight) oldY -= _inputHeight;
+		
+		// The last dimension is stored half
+		for(size_t x=0; x!=midX+1; ++x)
+		{
+			size_t oldIndex = x + oldY * (midX+1);
+			size_t newIndex1 = midX - x + y * _inputWidth;
+			
+			const std::complex<double>& val = fftData[oldIndex] * factor;
+			
+			realOutput[newIndex1] = val.real();
+			imaginaryOutput[newIndex1] = val.imag();
+			if(x != midX)
+			{
+				size_t yTo = _inputHeight-y;
+				if(yTo == _inputHeight) yTo = 0;
+				size_t newIndex2 = midX + x + yTo * _inputWidth;
+				realOutput[newIndex2] = val.real();
+				imaginaryOutput[newIndex2] = -val.imag();
+			}
+		}
+	}
+	
+	fftw_free(fftData);
 }

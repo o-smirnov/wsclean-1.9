@@ -53,6 +53,8 @@ class ImageWeights
 		void SetMinUVRange(double minUVInLambda);
 		
 		void Save(const std::string& filename);
+		
+		void RankFilter(double rankLimit, size_t windowSize);
 	private:
 		ImageWeights(const ImageWeights&) :
 			_weightMode(WeightMode::NaturalWeighted),
@@ -90,6 +92,8 @@ class ImageWeights
 				return 0.0;
 			}
 		}
+		
+		double windowMean(size_t x, size_t y, size_t windowSize);
 		
 		template<typename T>
 		static T frequencyToWavelength(const T frequency)

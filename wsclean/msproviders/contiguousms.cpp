@@ -182,6 +182,7 @@ void ContiguousMS::WriteModel(size_t rowId, std::complex<float>* buffer)
 void ContiguousMS::ReadWeights(std::complex<float>* buffer)
 {
 	readMeta();
+	readData();
 	readWeights();
 	size_t startChannel, endChannel;
 	if(_selection.HasChannelRange())
@@ -199,6 +200,7 @@ void ContiguousMS::ReadWeights(std::complex<float>* buffer)
 void ContiguousMS::ReadWeights(float* buffer)
 {
 	readMeta();
+	readData();
 	readWeights();
 	size_t startChannel, endChannel;
 	if(_selection.HasChannelRange())

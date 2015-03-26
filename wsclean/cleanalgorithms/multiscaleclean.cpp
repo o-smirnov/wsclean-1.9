@@ -140,7 +140,7 @@ void MultiScaleClean<ImageSetType>::executeMajorIterationForScale(double current
 	
 	size_t peakIndex = componentX + componentY*_rescaledWidth;
 	double peakNormalized = _dataImageLargeScale->JoinedValueNormalized(peakIndex) * rescaleFactor * rescaleFactor;
-	double firstThreshold = this->_threshold, stopGainThreshold = peakNormalized*(1.0-this->_stopGain)/thresholdBias;
+	double firstThreshold = this->_threshold, stopGainThreshold = fabs(peakNormalized*(1.0-this->_stopGain)/thresholdBias);
 	std::cout << "Scale-adjusted threshold: " << firstThreshold*thresholdBias << ", major iteration stops at " << stopGainThreshold*thresholdBias << '\n';
 	if(stopGainThreshold > firstThreshold)
 	{

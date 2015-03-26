@@ -19,15 +19,16 @@ public:
 	virtual std::string ToString() const
 	{
 		std::ostringstream str;
-		double f = NonLinearPowerLawFitter::Term0ToFactor(_terms[0], _terms[1]);
+		double term1 = _terms.size()>1 ? _terms[1] : 0.0;
+		double f = NonLinearPowerLawFitter::Term0ToFactor(_terms[0], term1);
 		double
 			i=f*_factors[0], q=f*_factors[1],
 			u=f*_factors[2], v=f*_factors[3];
 		str << "    sed {\n      frequency " << _referenceFrequency*1e-6 << " MHz\n      fluxdensity Jy "
 			<< i << " " << q << " " << u << " " << v <<
 			"\n      spectral-index { ";
-		str << _terms[1];
-		for(size_t i=2; i!=_terms.size(); ++i)
+		str << term1;
+		for(size_t i=2; i<_terms.size(); ++i)
 			str << ", " << _terms[i];
 		str << " }\n    }\n";
 		return str.str();
@@ -83,7 +84,8 @@ public:
 		if(refBrightness <= 0.0)
 			refBrightness = 1.0;
 		_terms.resize(siTerms.size()+1);
-		_terms[0] = NonLinearPowerLawFitter::FactorToTerm0(refBrightness, siTerms[0]);
+		double siterm0 = siTerms.empty() ? 0 : siTerms[0];
+		_terms[0] = NonLinearPowerLawFitter::FactorToTerm0(refBrightness, siterm0);
 		for(size_t i=0; i!=siTerms.size(); ++i)
 			_terms[i+1] = siTerms[i];
 		for(size_t p=0; p!=4; ++p)

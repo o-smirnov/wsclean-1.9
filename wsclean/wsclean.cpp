@@ -28,6 +28,7 @@
 #include "lofar/lmspredicter.h"
 #include "progressbar.h"
 #include "casamaskreader.h"
+#include "fftresampler.h"
 
 #include <iostream>
 #include <memory>
@@ -45,6 +46,7 @@ WSClean::WSClean() :
 	_memFraction(1.0), _absMemLimit(0.0),
 	_minUVInLambda(0.0), _maxUVInLambda(0.0), _wLimit(0.0),
 	_multiscaleThresholdBias(0.7), _multiscaleScaleBias(0.6),
+	_rankFilterLevel(0.0),
 	_nWLayers(0), _nIter(0), _antialiasingKernelSize(7), _overSamplingFactor(63),
 	_threadCount(sysconf(_SC_NPROCESSORS_ONLN)),
 	_globalSelection(),
@@ -53,7 +55,8 @@ WSClean::WSClean() :
 	_weightMode(WeightMode::UniformWeighted),
 	_prefixName("wsclean"),
 	_allowNegative(true), _smallPSF(false), _smallInversion(true), _stopOnNegative(false),
-	_useMoreSane(false), _makePSF(false), _isWeightImageSaved(false), _isGriddingImageSaved(false),
+	_useMoreSane(false), _makePSF(false), _isWeightImageSaved(false),
+	_isUVImageSaved(false), _isGriddingImageSaved(false),
 	_dftPrediction(false), _dftWithBeam(false),
 	_temporaryDirectory(),
 	_forceReorder(false), _forceNoReorder(false),
@@ -169,6 +172,11 @@ void WSClean::imagePSF(size_t currentChannelIndex, size_t joinedChannelIndex)
 	_psfImages.SetFitsWriter(_fitsWriter);
 	_psfImages.Store(_inversionAlgorithm->ImageRealResult(), *_polarizations.begin(), joinedChannelIndex, false);
 	_inversionWatch.Pause();
+	
+	if(_isUVImageSaved)
+	{
+		saveUVImage(_inversionAlgorithm->ImageRealResult(), *_polarizations.begin(), currentChannelIndex, false, "uvpsf");
+	}
 	
 	_isFirstInversion = false;
 	if(_fittedBeam)
@@ -483,6 +491,8 @@ void WSClean::initializeWeightTapers()
 		_imageWeights->SetMinUVRange(_minUVInLambda);
 	if(_maxUVInLambda!=0.0)
 		_imageWeights->SetMaxUVRange(_maxUVInLambda);
+	if(_rankFilterLevel >= 1.0)
+		_imageWeights->RankFilter(_rankFilterLevel, 16);
 }
 
 void WSClean::initializeMFSImageWeights()
@@ -965,6 +975,8 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 					_residualImages.Load(restoredImage, *curPol, currentChannelIndex, *isImaginary);
 					if(_nIter != 0)
 						writeFits("residual.fits", restoredImage, *curPol, currentChannelIndex, *isImaginary);
+					if(_isUVImageSaved)
+						saveUVImage(restoredImage, *curPol, currentChannelIndex, *isImaginary, "uv");
 					double* modelImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
 					_modelImages.Load(modelImage, *curPol, currentChannelIndex, *isImaginary);
 					ModelRenderer renderer(_fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM());
@@ -1508,4 +1520,15 @@ MSSelection WSClean::selectInterval(MSSelection& fullSelection)
 		);
 		return newSelection;
 	}
+}
+
+void WSClean::saveUVImage(const double* image, PolarizationEnum pol, size_t channelIndex, bool isImaginary, const std::string& prefix)
+{
+	ao::uvector<double>
+		realUV(_imgWidth*_imgHeight, std::numeric_limits<double>::quiet_NaN()),
+		imagUV(_imgWidth*_imgHeight, std::numeric_limits<double>::quiet_NaN());
+	FFTResampler fft(_imgWidth, _imgHeight, _imgWidth, _imgHeight, 1, true);
+	fft.SingleFT(image, realUV.data(), imagUV.data());
+	writeFits(prefix+"-real.fits", realUV.data(), pol, channelIndex, isImaginary);
+	writeFits(prefix+"-imag.fits", imagUV.data(), pol, channelIndex, isImaginary);
 }

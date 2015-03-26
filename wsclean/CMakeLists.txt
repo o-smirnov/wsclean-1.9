@@ -18,7 +18,7 @@ find_path(FITSIO_INCLUDE_DIR NAMES fitsio.h)
 find_path(FFTW3_INCLUDE_DIR NAMES fftw3.h)
 find_library(GSL_LIB NAMES gsl)
 find_path(GSL_INCLUDE_DIR NAMES gsl/gsl_version.h)
-find_library(CBLAS_LIB NAMES gslcblas)
+find_library(GSL_CBLAS_LIB NAMES gslcblas)
 
 set(CASA_LIBS ${CASA_MS_LIB} ${CASA_TABLES_LIB} ${CASA_MEASURES_LIB} ${CASA_CASA_LIB} ${CASA_FITS_LIB} ${DL_LIB})
 
@@ -43,24 +43,6 @@ include_directories(${Boost_INCLUDE_DIR})
 include_directories(${FITSIO_INCLUDE_DIR})
 include_directories(${FFTW3_INCLUDE_DIR})
 include_directories(${GSL_INCLUDE_DIR})
-
-# The following stuff will set the "rpath" correctly, so that
-# LD_LIBRARY_PATH doesn't have to be set.
-
-# use, i.e. don't skip the full RPATH for the build tree
-SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
-# when building, don't use the install RPATH already
-# (but later on when installing)
-SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-# add the automatically determined parts of the RPATH
-# which point to directories outside the build tree to the install RPATH
-SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-# the RPATH to be used when installing, but only if it's not a system directory
-LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-IF("${isSystemDir}" STREQUAL "-1")
-   SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-ENDIF("${isSystemDir}" STREQUAL "-1")
 
 set(CMAKE_REQUIRED_FLAGS "-std=c++0x")
 include(CheckCXXSourceCompiles)
@@ -105,10 +87,20 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_executable(wsclean wscleanmain.cpp wsclean.cpp casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/moresane.cpp cleanalgorithms/multiscaleclean.cpp cleanalgorithms/simpleclean.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp ${LBEAM_FILES})
+add_library(wsclean-lib interface/wscleaninterface.cpp wsclean.cpp casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/moresane.cpp cleanalgorithms/multiscaleclean.cpp cleanalgorithms/simpleclean.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp ${LBEAM_FILES})
+set_target_properties(wsclean-lib PROPERTIES OUTPUT_NAME wsclean)
+
+add_executable(wsclean wscleanmain.cpp)
+target_link_libraries(wsclean wsclean-lib ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${GSL_CBLAS_LIB} ${PTHREAD_LIB} ${LBEAM_LIBS})
+
+add_executable(purifyexample EXCLUDE_FROM_ALL interface/purifyexample.c)
+target_link_libraries(purifyexample wsclean-lib ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${GSL_CBLAS_LIB} ${LBEAM_LIBS})
 
 set_target_properties(wsclean PROPERTIES COMPILE_FLAGS "-std=c++0x")
+set_target_properties(wsclean-lib PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
-target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB} ${PTHREAD_LIB} ${LBEAM_LIBS})
+#target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB} ${PTHREAD_LIB} ${LBEAM_LIBS})
 
 install(TARGETS wsclean DESTINATION bin)
+install(TARGETS wsclean-lib DESTINATION lib)
+install(FILES interface/wscleaninterface.h DESTINATION include)

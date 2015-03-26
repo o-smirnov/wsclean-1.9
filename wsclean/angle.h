@@ -98,6 +98,10 @@ inline double Angle::Parse(const std::string& s, const std::string& valueDescrip
 	else if(unitStr.empty() || unitStr=="asec" || unitStr=="arcsec" || unitStr=="\'\'")
 		return val * M_PI/(180.0*60.0*60.0);
 	
+	// In marcsec?
+	else if(unitStr.empty() || unitStr=="masec" || unitStr=="marcsec")
+		return val * M_PI/(180.0*60.0*60.0*1000.0);
+	
 	// In radians
 	else if(unitStr.empty() || unitStr=="rad" || unitStr=="radians")
 		return val * M_PI/(180.0*60.0*60.0);
