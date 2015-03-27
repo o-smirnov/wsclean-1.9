@@ -49,8 +49,8 @@ void wsclean_main(const std::vector<std::string>& parms)
 
 void wsclean_initialize(
 	void** userData,
-	const struct purify_domain_info* domain_info,
-	struct purify_domain_data_format* data_info
+	const purify_domain_info* domain_info,
+	purify_domain_data_format* data_info
 )
 {
 	WSCleanUserData* wscUserData = new WSCleanUserData();
@@ -195,6 +195,7 @@ void wsclean_operator_A(
 	void* userData)
 {
 	WSCleanUserData* wscUserData = static_cast<WSCleanUserData*>(userData);
+	std::cout << "wsclean_operator_A(), image: " << wscUserData->width << " x " << wscUserData->height << ", pixelscale=" << Angle::ToNiceString(wscUserData->pixelScaleX) << "," << Angle::ToNiceString(wscUserData->pixelScaleY) << '\n';
 	
 	// Write dataIn to a fits file
 	FitsWriter writer;

@@ -12,8 +12,8 @@ int main(int argc, char* argv[])
 		printf("Specify measurement set: purifyexample <ms>\n");
 	}
 	else {
-		struct purify_domain_info dinfo;
-		struct purify_domain_data_format format;
+		purify_domain_info dinfo;
+		purify_domain_data_format format;
 
 		void* userdata;
 		dinfo.msPath=argv[1];
