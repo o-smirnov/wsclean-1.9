@@ -12,14 +12,15 @@
 struct WSCleanUserData
 {
 	std::string msPath;
-	int width;
-	int height;
+	unsigned int width;
+	unsigned int height;
 	double pixelScaleX;
 	double pixelScaleY;
 	std::string extraParameters;
 	
 	std::string dataColumn;
 	bool hasAImage, hasAtImage;
+	size_t nACalls, nAtCalls;
 };
 
 template<typename T>
@@ -62,6 +63,8 @@ void wsclean_initialize(
 	wscUserData->extraParameters = domain_info->extraParameters;
 	wscUserData->hasAImage = false;
 	wscUserData->hasAtImage = false;
+	wscUserData->nACalls = 0;
+	wscUserData->nAtCalls = 0;
 	(*userData) = static_cast<void*>(wscUserData);
 	
 	// Number of vis is nchannels x selected nrows; calculate both.
@@ -136,6 +139,11 @@ void wsclean_read(void* userData, DCOMPLEX* data, double* weights)
 				std::complex<double> val = 0.5*(std::complex<double>(*di) + std::complex<double>(*(di+polarizationCount-1)));
 				double weight = 0.5*(double(*wi) + (*wi+polarizationCount-1));
 				bool flag = *fi || *(fi+polarizationCount-1);
+				if(!std::isfinite(val.real()) || !std::isfinite(val.imag()))
+				{
+					val = 0.0;
+					weight = 0.0;
+				}
 				
 				dataPtr[ch] = val;
 				weightPtr[ch] = flag ? 0.0 : weight;
@@ -195,19 +203,29 @@ void wsclean_operator_A(
 	void* userData)
 {
 	WSCleanUserData* wscUserData = static_cast<WSCleanUserData*>(userData);
-	std::cout << "wsclean_operator_A(), image: " << wscUserData->width << " x " << wscUserData->height << ", pixelscale=" << Angle::ToNiceString(wscUserData->pixelScaleX) << "," << Angle::ToNiceString(wscUserData->pixelScaleY) << '\n';
+	std::cout << "------ wsclean_operator_A(), image: " << wscUserData->width << " x " << wscUserData->height << ", pixelscale=" << Angle::ToNiceString(wscUserData->pixelScaleX) << "," << Angle::ToNiceString(wscUserData->pixelScaleY) << '\n';
+	
+	// Remove non-finite values
+	for(size_t i=0; i!=wscUserData->width * wscUserData->height; ++i)
+	{
+		if(!std::isfinite(static_cast<double*>(dataIn)[i]))
+			static_cast<double*>(dataIn)[i] = 0.0;
+	}
+	
+	std::ostringstream filenameStr;
+	filenameStr << "tmp-operator-A-" << wscUserData->nACalls;
 	
 	// Write dataIn to a fits file
 	FitsWriter writer;
 	writer.SetImageDimensions(wscUserData->width, wscUserData->height, wscUserData->pixelScaleX, wscUserData->pixelScaleY);
-	writer.Write("tmp-operator-A-model.fits", static_cast<double*>(dataIn));
+	writer.Write(filenameStr.str() + "-model.fits", static_cast<double*>(dataIn));
 	wscUserData->hasAImage = true;
 	
 	// Run WSClean -predict (creates/fills new column MODEL_DATA)
 	std::vector<std::string> commandline;
 	getCommandLine(commandline, *wscUserData);
 	commandline.push_back("-name");
-	commandline.push_back("tmp-operator-A");
+	commandline.push_back(filenameStr.str());
 	commandline.push_back("-predict");
 	commandline.push_back(wscUserData->msPath);
 	wsclean_main(commandline);
@@ -242,6 +260,8 @@ void wsclean_operator_A(
 			dataPtr += nChannels;
 		}
 	}
+	++(wscUserData->nACalls);
+	std::cout << "------ end of wsclean_operator_A()\n";
 }
 
 // Go from visibilities to image
@@ -251,6 +271,7 @@ void wsclean_operator_At(
 {
 	// Write dataIn to the MODEL_DATA column
 	WSCleanUserData* wscUserData = static_cast<WSCleanUserData*>(userData);
+	std::cout << "------ wsclean_operator_At(), image: " << wscUserData->width << " x " << wscUserData->height << ", pixelscale=" << Angle::ToNiceString(wscUserData->pixelScaleX) << "," << Angle::ToNiceString(wscUserData->pixelScaleY) << '\n';
 	casa::MeasurementSet ms(wscUserData->msPath, casa::Table::Update);
 	BandData bandData(ms.spectralWindow());
 	size_t nChannels = bandData.ChannelCount();
@@ -283,16 +304,23 @@ void wsclean_operator_At(
 		}
 	}
 	
+	std::ostringstream prefixName;
+	prefixName << "tmp-operator-At-" << wscUserData->nAtCalls;
+	
 	// Run WSClean to create dirty image
 	std::vector<std::string> commandline;
 	getCommandLine(commandline, *wscUserData);
 	commandline.push_back("-name");
-	commandline.push_back("tmp-operator-At");
+	commandline.push_back(prefixName.str());
+	commandline.push_back("-datacolumn");
+	commandline.push_back("MODEL_DATA");
 	commandline.push_back(wscUserData->msPath);
 	wsclean_main(commandline);
 	wscUserData->hasAtImage = true;
 	
 	// Read dirty image and store in dataOut
-	FitsReader reader("tmp-operator-At-image.fits");
+	FitsReader reader(prefixName.str() + "-image.fits");
 	reader.Read(static_cast<double*>(dataOut));
+	++(wscUserData->nAtCalls);
+	std::cout << "------ end of wsclean_operator_At()\n";
 }
