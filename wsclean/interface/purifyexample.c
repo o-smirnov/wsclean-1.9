@@ -19,20 +19,24 @@ int main(int argc, char* argv[])
 		dinfo.msPath=argv[1];
 		dinfo.imageWidth = 512;
 		dinfo.imageHeight = 512;
-		dinfo.pixelScaleX = 0.5 * M_PI/(180.0*60.0*60.0); // 0.5 asec
-		dinfo.pixelScaleY = 0.5 * M_PI/(180.0*60.0*60.0);
+		dinfo.pixelScaleX = 5.0 * M_PI/(180.0*60.0); // 5 amin
+		dinfo.pixelScaleY = 5.0 * M_PI/(180.0*60.0);
 		dinfo.extraParameters="-weight natural";
 		
 		wsclean_initialize(&userdata, &dinfo, &format);
 		
 		complex double* mydata = (complex double*) malloc(format.data_size * sizeof(complex double));
+		complex double* emptydata = (complex double*) malloc(format.data_size * sizeof(complex double));
 		double* myweights = (double*) malloc(format.data_size * sizeof(double));
 		double* myimage = (double*) malloc(dinfo.imageWidth*dinfo.imageHeight * sizeof(double));
 		
-		wsclean_read(userdata, mydata, myweights);
+		wsclean_operator_At(emptydata, myimage, userdata);
+		wsclean_operator_A(myimage, mydata, userdata);
 		
+		wsclean_read(userdata, mydata, myweights);
 		wsclean_operator_At(mydata, myimage, userdata);
 		wsclean_operator_A(myimage, mydata, userdata);
+		
 		// ...do the purification magic...
 		
 		wsclean_write(userdata, myimage);
