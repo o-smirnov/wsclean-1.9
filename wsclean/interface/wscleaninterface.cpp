@@ -206,12 +206,23 @@ void wsclean_operator_A(
 	std::cout << "------ wsclean_operator_A(), image: " << wscUserData->width << " x " << wscUserData->height << ", pixelscale=" << Angle::ToNiceString(wscUserData->pixelScaleX) << "," << Angle::ToNiceString(wscUserData->pixelScaleY) << '\n';
 	
 	// Remove non-finite values
+	size_t nonFiniteValues = 0;
+	double imageSum = 0.0;
 	for(size_t i=0; i!=wscUserData->width * wscUserData->height; ++i)
 	{
 		if(!std::isfinite(static_cast<double*>(dataIn)[i]))
+		{
 			static_cast<double*>(dataIn)[i] = 0.0;
+			++nonFiniteValues;
+		}
+		else {
+			imageSum += static_cast<double*>(dataIn)[i];
+		}
 	}
-	
+	if(nonFiniteValues != 0)
+		std::cout << "Warning: input image contains " << nonFiniteValues << " non-finite values!\n";
+	std::cout << "Mean value in image: " << imageSum/(wscUserData->width*wscUserData->height-nonFiniteValues) << '\n';
+
 	std::ostringstream filenameStr;
 	filenameStr << "tmp-operator-A-" << wscUserData->nACalls;
 	
