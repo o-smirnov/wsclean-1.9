@@ -19,8 +19,8 @@ int main(int argc, char* argv[])
 		dinfo.msPath=argv[1];
 		dinfo.imageWidth = 512;
 		dinfo.imageHeight = 512;
-		dinfo.pixelScaleX = 5.0 * M_PI/(180.0*60.0); // 5 amin
-		dinfo.pixelScaleY = 5.0 * M_PI/(180.0*60.0);
+		dinfo.pixelScaleX = 2.0 * M_PI/(180.0*60.0); // 2 amin
+		dinfo.pixelScaleY = 2.0 * M_PI/(180.0*60.0);
 		dinfo.extraParameters="-weight natural";
 		
 		wsclean_initialize(&userdata, &dinfo, &format);
@@ -34,6 +34,13 @@ int main(int argc, char* argv[])
 		wsclean_operator_A(myimage, mydata, userdata);
 		
 		wsclean_read(userdata, mydata, myweights);
+		wsclean_operator_At(mydata, myimage, userdata);
+		wsclean_operator_A(myimage, mydata, userdata);
+		
+		size_t i;
+		for(i=0; i!=format.data_size; ++i)
+			mydata[i] = 1.0;
+		
 		wsclean_operator_At(mydata, myimage, userdata);
 		wsclean_operator_A(myimage, mydata, userdata);
 		

@@ -383,10 +383,11 @@ void WSInversion::workThreadParallel(const MultiBandData* selectedBand)
 	// did not help.
 	std::unique_ptr<lane_write_buffer<InversionWorkSample>[]>
 		bufferedLanes(new lane_write_buffer<InversionWorkSample>[_cpuCount]);
+	size_t bufferedLaneSize = std::max<size_t>(selectedBand->FirstBand().ChannelCount(), _laneBufferSize);
 	for(size_t i=0; i!=_cpuCount; ++i)
 	{
 		lanes[i].resize(selectedBand->FirstBand().ChannelCount() * _laneBufferSize);
-		bufferedLanes[i].reset(&lanes[i], std::max<size_t>(selectedBand->FirstBand().ChannelCount(), _laneBufferSize));
+		bufferedLanes[i].reset(&lanes[i], bufferedLaneSize);
 		
 		group.add_thread(new boost::thread(&WSInversion::workThreadPerSample, this, &lanes[i]));
 	}
@@ -404,6 +405,7 @@ void WSInversion::workThreadParallel(const MultiBandData* selectedBand)
 			sampleData.vInLambda = workItem.v / wavelength;
 			sampleData.wInLambda = workItem.w / wavelength;
 			size_t cpu = _imager->WToLayer(sampleData.wInLambda) % _cpuCount;
+			//std::cout << cpu << ' ' << lanes[cpu].size() << '\n';
 			bufferedLanes[cpu].write(sampleData);
 		}
 		delete[] workItem.data;

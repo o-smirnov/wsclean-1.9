@@ -50,8 +50,8 @@ void wsclean_main(const std::vector<std::string>& parms)
 
 void wsclean_initialize(
 	void** userData,
-	const purify_domain_info* domain_info,
-	purify_domain_data_format* data_info
+	const imaging_parameters* domain_info,
+	imaging_data* data_info
 )
 {
 	WSCleanUserData* wscUserData = new WSCleanUserData();
@@ -81,7 +81,7 @@ void wsclean_initialize(
 			++selectedRows;
 	}
 	
-	data_info->data_size = selectedRows * nChannel;
+	data_info->dataSize = selectedRows * nChannel;
 	
 	bool hasCorrected = ms.tableDesc().isColumn("CORRECTED_DATA");
 	if(hasCorrected) {
@@ -165,7 +165,7 @@ void wsclean_write(void* userData, const double* image)
 	writer.SetImageDimensions(wscUserData->width, wscUserData->height, wscUserData->pixelScaleX, wscUserData->pixelScaleY);
 	if(wscUserData->hasAtImage)
 	{
-		FitsReader reader("tmp-operator-At-image.fits");
+		FitsReader reader("tmp-operator-At-0-image.fits");
 		writer = FitsWriter(reader);
 	}
 	writer.Write("purify-wsclean-model.fits", image);
@@ -265,6 +265,10 @@ void wsclean_operator_A(
 			for(size_t ch=0; ch!=nChannels; ++ch)
 			{
 				dataPtr[ch] = 0.5 * (std::complex<double>(*di) + std::complex<double>(*(di+polarizationCount-1)));
+				// This *might* change the weighting; but if a value is not finite, it should already
+				// have received zero weight during the initial read out.
+				if(!std::isfinite(dataPtr[ch].real()) || !std::isfinite(dataPtr[ch].imag()))
+					dataPtr[ch] = 0.0;
 				di += polarizationCount;
 			}
 			
@@ -334,4 +338,9 @@ void wsclean_operator_At(
 	reader.Read(static_cast<double*>(dataOut));
 	++(wscUserData->nAtCalls);
 	std::cout << "------ end of wsclean_operator_At()\n";
+}
+
+double wsclean_parse_angle(const char* angle)
+{
+	return Angle::Parse(angle, "angle", Angle::Degrees);
 }

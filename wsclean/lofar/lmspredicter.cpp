@@ -15,7 +15,7 @@ LMSPredicter::~LMSPredicter()
 void LMSPredicter::InitializeInput(const Model& model)
 {
 	casa::MSField fTable(_ms.field());
-	casa::MDirection::ROScalarColumn refDirColumn(fTable, fTable.columnName(casa::MSFieldEnums::REFERENCE_DIR));
+	casa::MDirection::ROScalarColumn refDirColumn(fTable, fTable.columnName(casa::MSFieldEnums::PHASE_DIR));
 	casa::MDirection refDir = refDirColumn(0);
 	casa::Vector<casa::Double> val = refDir.getValue().get();
 	double ra = val[0];

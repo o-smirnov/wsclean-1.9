@@ -3,21 +3,7 @@
 
 #include <complex.h>
 
-typedef struct
-{
-	const char* msPath;
-	int imageWidth;
-	int imageHeight;
-	double pixelScaleX;
-	double pixelScaleY;
-	const char* extraParameters;
-} purify_domain_info;
-
-typedef struct
-{
-	long data_size;
-	// could also hold the fact that we are dealing with complex doubles.
-} purify_domain_data_format;
+#include "imaginginterface.h"
 
 #ifdef __cplusplus
 #include <complex>
@@ -43,8 +29,8 @@ extern "C" {
  */
 void wsclean_initialize(
 	void** userData,
-	const purify_domain_info* domain_info,
-	purify_domain_data_format* data_info
+	const imaging_parameters* domain_info,
+	imaging_data* data_info
 );
 
 /**
@@ -73,6 +59,8 @@ void wsclean_operator_A(
 void wsclean_operator_At(
 	void* dataIn, void* dataOut,
 	void* userData);
+
+double wsclean_parse_angle(const char* angle);
 
 #ifdef __cplusplus
 }

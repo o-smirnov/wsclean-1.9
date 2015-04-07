@@ -266,8 +266,6 @@ void DFTPredictionAlgorithm::predict(MC2x2& dest, double u, double v, double w, 
 	double angle = 2.0*M_PI*(u*l + v*m + w*(lmsqrt-1.0));
 	double sinangleOverLMS, cosangleOverLMS;
 	sincos(angle, &sinangleOverLMS, &cosangleOverLMS);
-	sinangleOverLMS /= lmsqrt;
-	cosangleOverLMS /= lmsqrt;
 	MC2x2 temp, appFlux;
 	MC2x2::ATimesB(temp, component.AntennaInfo(a1).BeamValue(channelIndex), component.LinearFlux(channelIndex));
 	MC2x2::ATimesHermB(appFlux, temp, component.AntennaInfo(a2).BeamValue(channelIndex));

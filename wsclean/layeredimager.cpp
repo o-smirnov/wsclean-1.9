@@ -528,11 +528,11 @@ void LayeredImager::finalizeImage(double multiplicationFactor, std::vector<doubl
 	double *dataPtr = dataArray[0];
 	for(size_t y=0;y!=_height;++y)
 	{
-		double m = ((double) y-(_height/2)) * _pixelSizeY + _phaseCentreDM;
+		//double m = ((double) y-(_height/2)) * _pixelSizeY + _phaseCentreDM;
 		for(size_t x=0;x!=_width;++x)
 		{
-			double l = ((_width/2)-(double) x) * _pixelSizeX + _phaseCentreDL;
-			*dataPtr *= multiplicationFactor * sqrt(1.0 - l*l - m*m);
+			//double l = ((_width/2)-(double) x) * _pixelSizeX + _phaseCentreDL;
+			*dataPtr *= multiplicationFactor;
 			++dataPtr;
 		}
 	}
@@ -592,7 +592,7 @@ void LayeredImager::initializePrediction(const double* image, double multiplicat
 		{
 			double l = ((_width/2)-(double) x) * _pixelSizeX + _phaseCentreDL;
 			if(std::isfinite(*dataPtr) && l*l + m*m < 1.0)
-				*dataPtr = *inPtr * multiplicationFactor / sqrt(1.0 - l*l - m*m);
+				*dataPtr = *inPtr * multiplicationFactor;
 			else
 				*dataPtr = 0.0;
 			++dataPtr;
