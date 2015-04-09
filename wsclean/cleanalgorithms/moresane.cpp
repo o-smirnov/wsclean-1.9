@@ -24,6 +24,8 @@ void MoreSane::ExecuteMajorIteration(double* dataImage, double* modelImage, cons
 	}
 	FitsWriter writer;
 	writer.SetImageDimensions(width, height);
+	if(this->_cleanMask != 0)
+		writer.WriteMask("tmp-moresaneinput-mask.fits", _cleanMask);
 	std::ostringstream outputStr;
 	outputStr << "tmp-moresaneoutput" << _iterationNumber;
 	const std::string
@@ -38,6 +40,10 @@ void MoreSane::ExecuteMajorIteration(double* dataImage, double* modelImage, cons
 		<< "python \"" << _moresaneLocation << "\" ";
 	if(!_allowNegativeComponents)
 		commandLine << "-ep ";
+	if(this->_cleanMask != 0)
+		commandLine << "-m tmp-moresaneinput-mask.fits ";
+	if(!_moresaneArguments.empty())
+		commandLine << _moresaneArguments<< ' ';
 	commandLine << "\"" << dirtyName << "\" \"" << psfName << "\" \"" <<  outputName << '\"';
 	std::cout << "Running: " << commandLine.str() << std::endl;
 	int pid = vfork();

@@ -51,6 +51,8 @@ class FitsWriter : protected FitsIOChecker
 		
 		template<typename NumType> void Write(const std::string& filename, const NumType* image) const;
 		
+		void WriteMask(const std::string& filename, const bool* mask) const;
+		
 		void StartMulti(const std::string& filename, size_t nPol, size_t nFreq);
 		
 		template<typename NumType> void AddToMulti(const NumType* image)

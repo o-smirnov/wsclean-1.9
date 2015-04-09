@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 
 project(wsclean)
 
-set(CMAKE_CXX_FLAGS "-O3 -Wall -DNDEBUG -march=native -msse4.1")
+set(CMAKE_CXX_FLAGS "-O3 -Wall -DNDEBUG -march=native -msse4.1 -ggdb")
 
 find_library(CASA_MS_LIB casa_ms REQUIRED)
 find_library(CASA_TABLES_LIB casa_tables REQUIRED)

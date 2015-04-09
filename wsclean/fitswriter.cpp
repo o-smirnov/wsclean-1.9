@@ -1,6 +1,8 @@
 #include "fitswriter.h"
 #include "fitsreader.h"
 
+#include "uvector.h"
+
 #include <stdexcept>
 #include <sstream>
 #include <vector>
@@ -157,6 +159,14 @@ void FitsWriter::writeImage(fitsfile* fptr, const std::string& filename, const N
 	for(size_t i=0;i!=totalSize;++i) copy[i] = image[i];
 	fits_write_pixnull(fptr, TDOUBLE, firstpixel, totalSize, &copy[0], &nullValue, &status);
 	checkStatus(status, filename);
+}
+
+void FitsWriter::WriteMask(const std::string& filename, const bool* mask) const
+{
+	ao::uvector<float> maskAsImage(_width * _height);
+	for(size_t i=0; i!=_width*_height; ++i)
+		maskAsImage[i] = mask[i] ? 1.0 : 0.0;
+	Write(filename, maskAsImage.data());
 }
 
 template<typename NumType>
