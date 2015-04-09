@@ -9,7 +9,7 @@
 class MoreSane : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
 {
 	public:
-		MoreSane(const std::string& moreSaneLocation) : _moresaneLocation(moreSaneLocation)
+		MoreSane(const std::string& moreSaneLocation, const std::string& moresaneArguments) : _moresaneLocation(moreSaneLocation), _moresaneArguments(moresaneArguments)
 		{ }
 		
     virtual void ExecuteMajorIteration(ImageSet& dataImage, ImageSet& modelImage, std::vector<double*> psfImages, size_t width, size_t height, bool& reachedMajorThreshold)
@@ -20,7 +20,7 @@ class MoreSane : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
 		
 		void ExecuteMajorIteration(double* dataImage, double* modelImage, const double* psfImage, size_t width, size_t height, bool& reachedMajorThreshold);
 	private:
-		const std::string _moresaneLocation;
+		const std::string _moresaneLocation, _moresaneArguments;
 		ImageBufferAllocator<double>* _allocator;
 };
 

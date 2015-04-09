@@ -94,6 +94,7 @@ public:
 	void SetDFTWithBeam(bool applyBeam) { _dftWithBeam = applyBeam; }
 	void SetUseMoreSane(bool useMoreSane) { _useMoreSane = useMoreSane; }
 	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
+	void SetMoreSaneArgs(const std::string& arguments) { _moreSaneArgs = arguments; }
 	void SetRankFilterLevel(double level) { _rankFilterLevel = level; }
 	
 	void AddInputMS(const std::string& msPath) { _filenames.push_back(msPath); }
@@ -220,7 +221,7 @@ private:
 	WeightMode _weightMode;
 	std::string _prefixName;
 	bool _allowNegative, _smallPSF, _smallInversion, _stopOnNegative, _useMoreSane, _makePSF, _isWeightImageSaved, _isUVImageSaved, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
-	std::string _temporaryDirectory, _moreSaneLocation;
+	std::string _temporaryDirectory, _moreSaneLocation, _moreSaneArgs;
 	bool _forceReorder, _forceNoReorder, _modelUpdateRequired, _joinedPolarizationCleaning, _joinedFrequencyCleaning, _mfsWeighting, _multiscale;
 	enum LayeredImager::GridModeEnum _gridMode;
 	std::vector<std::string> _filenames;

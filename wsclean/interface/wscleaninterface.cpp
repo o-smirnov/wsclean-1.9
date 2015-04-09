@@ -3,6 +3,7 @@
 #undef WSCLEAN_NO_MAIN
 
 #include "wscleaninterface.h"
+
 #include "../banddata.h"
 
 #include <string>
@@ -82,6 +83,13 @@ void wsclean_initialize(
 	}
 	
 	data_info->dataSize = selectedRows * nChannel;
+	data_info->lhs_data_type = imaging_data::DATA_TYPE_COMPLEX_DOUBLE;
+	data_info->rhs_data_type = imaging_data::DATA_TYPE_DOUBLE;
+	data_info->deinitialize_function = wsclean_deinitialize;
+	data_info->read_function = wsclean_read;
+	data_info->write_function = wsclean_write;
+	data_info->operator_A_function = wsclean_operator_A;
+	data_info->operator_At_function = wsclean_operator_At;
 	
 	bool hasCorrected = ms.tableDesc().isColumn("CORRECTED_DATA");
 	if(hasCorrected) {
@@ -198,9 +206,7 @@ void getCommandLine(std::vector<std::string>& commandline, const WSCleanUserData
 // Go from image to visibilities
 // dataIn :  double[] of size width*height
 // dataOut : complex double[] of size nvis: nchannels x nbaselines x ntimesteps
-void wsclean_operator_A(
-	void* dataIn, void* dataOut,
-	void* userData)
+void wsclean_operator_A(void* userData, void* dataOut, void* dataIn)
 {
 	WSCleanUserData* wscUserData = static_cast<WSCleanUserData*>(userData);
 	std::cout << "------ wsclean_operator_A(), image: " << wscUserData->width << " x " << wscUserData->height << ", pixelscale=" << Angle::ToNiceString(wscUserData->pixelScaleX) << "," << Angle::ToNiceString(wscUserData->pixelScaleY) << '\n';
@@ -280,9 +286,7 @@ void wsclean_operator_A(
 }
 
 // Go from visibilities to image
-void wsclean_operator_At(
-	void* dataIn, void* dataOut,
-	void* userData)
+void wsclean_operator_At(void* userData, void* dataOut, void* dataIn)
 {
 	// Write dataIn to the MODEL_DATA column
 	WSCleanUserData* wscUserData = static_cast<WSCleanUserData*>(userData);

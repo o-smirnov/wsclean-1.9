@@ -183,6 +183,9 @@ int main(int argc, char *argv[])
 			"   Stop on negative components. Not the default.\n"
 			"-moresane-ext <location>\n"
 			"   Use the MoreSane deconvolution algorithm, installed at the specified location.\n"
+			"-moresane-arg <arguments>\n"
+			"   Pass the specified arguments to moresane. Note that multiple parameters have to be\n"
+			"   enclosed in quotes.\n"
 			"\n"
 			"  ** RESTORATION OPTIONS **\n"
 			"-beamsize <arcsec>\n"
@@ -301,6 +304,11 @@ int main(int argc, char *argv[])
 			++argi;
 			wsclean.SetUseMoreSane(true);
 			wsclean.SetMoreSaneLocation(argv[argi]);
+		}
+		else if(param == "moresane-arg")
+		{
+			++argi;
+			wsclean.SetMoreSaneArgs(argv[argi]);
 		}
 		else if(param == "makepsf")
 		{

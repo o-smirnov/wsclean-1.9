@@ -538,7 +538,7 @@ void WSClean::initializeCleanAlgorithm()
 	if(_useMoreSane)
 	{
 		_cleanAlgorithms.resize(1);
-		_cleanAlgorithms[0] = new MoreSane(_moreSaneLocation);
+		_cleanAlgorithms[0] = new MoreSane(_moreSaneLocation, _moreSaneArgs);
 		count = 1;
 	}
 	else if(_joinedPolarizationCleaning)

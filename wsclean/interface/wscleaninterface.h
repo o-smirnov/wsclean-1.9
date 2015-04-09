@@ -5,6 +5,7 @@
 
 #include "imaginginterface.h"
 
+#ifndef DCOMPLEX
 #ifdef __cplusplus
 #include <complex>
 #define DCOMPLEX std::complex<double>
@@ -12,7 +13,8 @@ extern "C" {
 #else
 #define DCOMPLEX double complex
 #endif
-
+#endif
+	
 /**
  * Initialize WSClean for use as measurement operator in compressed sensing
  * application. This should be called before any other function.
@@ -34,6 +36,11 @@ void wsclean_initialize(
 );
 
 /**
+ * Clean up.
+ */
+void wsclean_deinitialize(void* userData);
+
+/**
  * Initializes the data array
  * @p data An already allocated array of data which will be set to the selected data
  * in the measurement set.
@@ -47,18 +54,11 @@ void wsclean_read(void* userData, DCOMPLEX* data, double* weights);
  */
 void wsclean_write(void* userData, const double* image);
 
-/**
- * Clean up.
- */
-void wsclean_deinitialize(void* userData);
+void wsclean_operator_A(void* userData,
+	void* dataOut, void* dataIn);
 
-void wsclean_operator_A(
-	void* dataIn, void* dataOut,
-	void* userData);
-
-void wsclean_operator_At(
-	void* dataIn, void* dataOut,
-	void* userData);
+void wsclean_operator_At(void* userData,
+	void* dataOut, void* dataIn);
 
 double wsclean_parse_angle(const char* angle);
 
