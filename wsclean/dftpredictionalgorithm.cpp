@@ -266,9 +266,16 @@ void DFTPredictionAlgorithm::predict(MC2x2& dest, double u, double v, double w, 
 	double angle = 2.0*M_PI*(u*l + v*m + w*(lmsqrt-1.0));
 	double sinangleOverLMS, cosangleOverLMS;
 	sincos(angle, &sinangleOverLMS, &cosangleOverLMS);
-	MC2x2 temp, appFlux;
-	MC2x2::ATimesB(temp, component.AntennaInfo(a1).BeamValue(channelIndex), component.LinearFlux(channelIndex));
-	MC2x2::ATimesHermB(appFlux, temp, component.AntennaInfo(a2).BeamValue(channelIndex));
+	MC2x2 appFlux;
+	if(_hasBeam)
+	{
+		MC2x2 temp;
+		MC2x2::ATimesB(temp, component.AntennaInfo(a1).BeamValue(channelIndex), component.LinearFlux(channelIndex));
+		MC2x2::ATimesHermB(appFlux, temp, component.AntennaInfo(a2).BeamValue(channelIndex));
+	}
+	else {
+		appFlux = component.LinearFlux(channelIndex);
+	}
 	if(component.IsGaussian())
 	{
 		const double* gausTrans = component.GausTransformationMatrix();
@@ -297,6 +304,11 @@ void DFTPredictionAlgorithm::predict(MC2x2& dest, double u, double v, double w, 
 
 void DFTPredictionAlgorithm::UpdateBeam(LBeamEvaluator& beamEvaluator)
 {
+	if(!_hasBeam)
+	{
+		std::cout << "Using beam in prediction...\n";
+		_hasBeam = true;
+	}
 	for(DFTPredictionInput::iterator component=_input.begin(); component!=_input.end(); ++component)
 	{
 		LBeamEvaluator::PrecalcPosInfo posInfo;

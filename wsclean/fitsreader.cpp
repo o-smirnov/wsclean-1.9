@@ -206,7 +206,7 @@ void FitsReader::initialize()
 	if(ReadStringKeyIfExists("CUNIT2", tmp) && tmp != "deg")
 		throw std::runtime_error("Invalid value for CUNIT2");
 	double centrePixelY = 0.0;
-	if(ReadDoubleKeyIfExists("CRPIX1", centrePixelY))
+	if(ReadDoubleKeyIfExists("CRPIX2", centrePixelY))
 		_phaseCentreDM = ((_imgHeight / 2.0)+1.0 - centrePixelY) * _pixelSizeY;
 	else
 		_phaseCentreDM = 0.0;

@@ -177,7 +177,7 @@ private:
 class DFTPredictionAlgorithm
 {
 public:
-	DFTPredictionAlgorithm(DFTPredictionInput& input, const BandData& band) : _input(input), _band(band)
+	DFTPredictionAlgorithm(DFTPredictionInput& input, const BandData& band) : _input(input), _band(band), _hasBeam(false)
 	{ }
 	
 	void Predict(MC2x2& dest, double u, double v, double w, size_t channelIndex, size_t a1, size_t a2);
@@ -189,6 +189,7 @@ private:
 	
 	DFTPredictionInput& _input;
 	BandData _band;
+	bool _hasBeam;
 };
 
 #endif

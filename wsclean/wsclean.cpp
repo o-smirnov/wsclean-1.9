@@ -46,7 +46,7 @@ WSClean::WSClean() :
 	_memFraction(1.0), _absMemLimit(0.0),
 	_minUVInLambda(0.0), _maxUVInLambda(0.0), _wLimit(0.0),
 	_multiscaleThresholdBias(0.7), _multiscaleScaleBias(0.6),
-	_rankFilterLevel(0.0),
+	_rankFilterLevel(0.0), _rankFilterSize(16),
 	_nWLayers(0), _nIter(0), _antialiasingKernelSize(7), _overSamplingFactor(63),
 	_threadCount(sysconf(_SC_NPROCESSORS_ONLN)),
 	_globalSelection(),
@@ -492,7 +492,7 @@ void WSClean::initializeWeightTapers()
 	if(_maxUVInLambda!=0.0)
 		_imageWeights->SetMaxUVRange(_maxUVInLambda);
 	if(_rankFilterLevel >= 1.0)
-		_imageWeights->RankFilter(_rankFilterLevel, 16);
+		_imageWeights->RankFilter(_rankFilterLevel, _rankFilterSize);
 }
 
 void WSClean::initializeMFSImageWeights()
@@ -1297,7 +1297,8 @@ void WSClean::performJoinedPolClean(size_t currentChannelIndex, bool& reachedMaj
 		linPolsFour[4] = { Polarization::XX, Polarization::XY, Polarization::XY, Polarization::YY },
 		linPolsTwo[2] = { Polarization::XX, Polarization::YY },
 		stokesPols[4] = { Polarization::StokesI, Polarization::StokesQ, Polarization::StokesU, Polarization::StokesV },
-		*pols = hasStokesPols ? stokesPols : (PolCount==4 ? linPolsFour : linPolsTwo);
+		singlePol[1] = { *_polarizations.begin() },
+		*pols = (PolCount==1) ? singlePol : (hasStokesPols ? stokesPols : (PolCount==4 ? linPolsFour : linPolsTwo));
 	for(size_t i=0; i!=PolCount; ++i)
 	{
 		PolarizationEnum polarization = pols[i];
@@ -1382,7 +1383,8 @@ void WSClean::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majo
 		linPolsFour[4] = { Polarization::XX, Polarization::XY, Polarization::XY, Polarization::YY },
 		linPolsTwo[2] = { Polarization::XX, Polarization::YY },
 		stokesPols[4] = { Polarization::StokesI, Polarization::StokesQ, Polarization::StokesU, Polarization::StokesV },
-		*pols = hasStokesPols ? stokesPols : (PolCount==4 ? linPolsFour : linPolsTwo);
+		singlePol[1] = { *_polarizations.begin() },
+		*pols = (PolCount==1) ? singlePol : (hasStokesPols ? stokesPols : (PolCount==4 ? linPolsFour : linPolsTwo));
 	for(size_t ch=0; ch!=_channelsOut; ++ch)
 	{
 		for(size_t i=0; i!=PolCount; ++i)

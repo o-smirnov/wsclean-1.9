@@ -87,9 +87,11 @@ int main(int argc, char *argv[])
 			"   Default: off, unless -joinchannels is specified.\n"
 			"-nomfsweighting\n"
 			"   Opposite of -mfsweighting; can be used to turn off MFS weighting in -joinchannels mode.\n"
-			"-weightingrankfilter <level>\n"
+			"-weighting-rank-filter <level>\n"
 			"   Filter the weights and set high weights to the local mean. The level parameter specifies\n"
 			"   the filter level; any value larger than level*localmean will be set to level*localmean.\n"
+			"-weighting-rank-filter-size <size>\n"
+			"   Set size of weighting rank filter. Default: 16.\n"
 			"-gridmode <nn or kb>\n"
 			"   Kernel and mode used for gridding: kb = Kaiser-Bessel (default with 7 pixels), nn = nearest\n"
 			"   neighbour (no kernel). Default: kb.\n"
@@ -407,10 +409,15 @@ int main(int argc, char *argv[])
 			++argi;
 			wsclean.SetMultiscaleScaleBias(atof(argv[argi]));
 		}
-		else if(param == "weightingrankfilter")
+		else if(param == "weighting-rank-filter")
 		{
 			++argi;
 			wsclean.SetRankFilterLevel(atof(argv[argi]));
+		}
+		else if(param == "weighting-rank-filter-size")
+		{
+			++argi;
+			wsclean.SetRankFilterSize(atoi(argv[argi]));
 		}
 		else if(param == "cleanborder")
 		{

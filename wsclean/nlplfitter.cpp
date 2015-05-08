@@ -316,7 +316,7 @@ void NonLinearPowerLawFitter::fit_implementation(std::vector<double>& terms, siz
 		status = gsl_multifit_test_delta(_data->solver->dx, _data->solver->x, 1e-6, 1e-6);
 		
   } while (status == GSL_CONTINUE && iter < 5000);
-	std::cout << "niter=" << iter << ", status=" << gsl_strerror(status) << "\n";
+	//std::cout << "niter=" << iter << ", status=" << gsl_strerror(status) << "\n";
 	
 	for(size_t i=0; i!=nTerms; ++i)
 		terms[i] = gsl_vector_get (_data->solver->x, i);

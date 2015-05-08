@@ -56,10 +56,20 @@ public:
 		else
 			return true;
 	}
+	
 	bool IsFieldSelected(size_t fieldId) const
 	{
 		return fieldId == _fieldId;
 	}
+	
+	bool IsTimeSelected(size_t timestep)
+	{
+		if(HasInterval() && (timestep < _startTimestep || timestep >= _endTimestep))
+			return false;
+		else
+			return true;
+	}
+	
 	void SetFieldId(size_t fieldId)
 	{ 
 		_fieldId = fieldId; 

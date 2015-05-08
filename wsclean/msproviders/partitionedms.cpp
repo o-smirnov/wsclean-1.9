@@ -348,8 +348,8 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 	metaFile.write(msPath.c_str(), msPath.size());
 	
 	// Write actual data
-	timestep = 0;
-	time = timeColumn(0);
+	timestep = selection.HasInterval() ? selection.IntervalStart() : 0;
+	time = timeColumn(startRow);
 	
 	std::vector<std::complex<float>> dataBuffer(polarizationCount * (1 + channelCount / channelParts));
 	std::vector<float> weightBuffer(polarizationCount * (1 + channelCount / channelParts));
@@ -357,9 +357,9 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 	casa::Array<std::complex<float>> dataArray(shape);
 	casa::Array<bool> flagArray(shape);
 	ProgressBar progress1("Reordering");
-	for(size_t row=0; row!=ms.nrow(); ++row)
+	for(size_t row=startRow; row!=endRow; ++row)
 	{
-		progress1.SetProgress(row, ms.nrow());
+		progress1.SetProgress(row-startRow, endRow-startRow);
 		const int
 			a1 = antenna1Column(row), a2 = antenna2Column(row),
 			fieldId = fieldIdColumn(row);

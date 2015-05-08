@@ -96,6 +96,7 @@ public:
 	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
 	void SetMoreSaneArgs(const std::string& arguments) { _moreSaneArgs = arguments; }
 	void SetRankFilterLevel(double level) { _rankFilterLevel = level; }
+	void SetRankFilterSize(size_t nPixels) { _rankFilterSize = nPixels; }
 	
 	void AddInputMS(const std::string& msPath) { _filenames.push_back(msPath); }
 	
@@ -214,6 +215,7 @@ private:
 	double _manualBeamMajorSize, _manualBeamMinorSize, _manualBeamPA;
 	bool _fittedBeam, _circularBeam;
 	double _memFraction, _absMemLimit, _minUVInLambda, _maxUVInLambda, _wLimit, _multiscaleThresholdBias, _multiscaleScaleBias, _rankFilterLevel;
+	size_t _rankFilterSize;
 	size_t _nWLayers, _nIter, _antialiasingKernelSize, _overSamplingFactor, _threadCount;
 	MSSelection _globalSelection, _currentPartSelection;
 	std::string _columnName;
