@@ -206,7 +206,12 @@ private:
 	
 	bool preferReordering() const
 	{
-		return ((_channelsOut != 1) || (_polarizations.size()>=4) || _forceReorder) && !_forceNoReorder;
+		return (
+			(_channelsOut != 1) ||
+			(_polarizations.size()>=4) ||
+			(_mGain != 1.0) ||
+			_forceReorder
+		) && !_forceNoReorder;
 	}
 	
 	size_t _imgWidth, _imgHeight, _channelsOut, _intervalCount;
@@ -230,10 +235,14 @@ private:
 	std::string _commandLine;
 	
 	struct ChannelInfo {
-		ChannelInfo() : weight(0.0), bandStart(0.0), bandEnd(0.0)
+		ChannelInfo() :
+			weight(0.0),
+			bandStart(0.0), bandEnd(0.0),
+			beamMaj(0.0), beamMin(0.0), beamPA(0.0)
 		{ }
 		double weight;
 		double bandStart, bandEnd;
+		double beamMaj, beamMin, beamPA;
 	};
 	std::vector<ChannelInfo> _infoPerChannel;
 	

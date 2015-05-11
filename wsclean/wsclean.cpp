@@ -179,7 +179,12 @@ void WSClean::imagePSF(size_t currentChannelIndex, size_t joinedChannelIndex)
 	}
 	
 	_isFirstInversion = false;
-	if(_fittedBeam)
+	if(_manualBeamMajorSize != 0.0)
+	{
+		_infoPerChannel[currentChannelIndex].beamMaj = _manualBeamMajorSize;
+		_infoPerChannel[currentChannelIndex].beamMin = _manualBeamMinorSize;
+		_infoPerChannel[currentChannelIndex].beamPA = _manualBeamPA;
+	} else if(_fittedBeam)
 	{
 		double bMaj, bMin, bPA;
 		GaussianFitter beamFitter;
@@ -197,21 +202,27 @@ void WSClean::imagePSF(size_t currentChannelIndex, size_t joinedChannelIndex)
 		Angle::ToNiceString(bMin) << ", PA=" << Angle::ToNiceString(bPA) << ", theoretical=" <<
 		Angle::ToNiceString(_inversionAlgorithm->BeamSize())<< ".\n";
 		
-		_manualBeamMajorSize = bMaj;
+		_infoPerChannel[currentChannelIndex].beamMaj = bMaj;
 		if(_circularBeam)
 		{
-			_manualBeamMinorSize = _manualBeamMajorSize;
-			_manualBeamPA = 0.0;
+			_infoPerChannel[currentChannelIndex].beamMin = bMaj;
+			_infoPerChannel[currentChannelIndex].beamPA = 0.0;
 		}
 		else {
-			_manualBeamMinorSize = bMin;
-			_manualBeamPA = bPA;
+			_infoPerChannel[currentChannelIndex].beamMin = bMin;
+			_infoPerChannel[currentChannelIndex].beamPA = bPA;
 		}
-		initFitsWriter(_fitsWriter);
 	}
 	else {
-		std::cout << "Beam size is " << _inversionAlgorithm->BeamSize()*(180.0*60.0/M_PI) << " arcmin.\n";
+		_infoPerChannel[currentChannelIndex].beamMaj = _inversionAlgorithm->BeamSize();
+		_infoPerChannel[currentChannelIndex].beamMin = _inversionAlgorithm->BeamSize();
+		_infoPerChannel[currentChannelIndex].beamPA = 0.0;
+		std::cout << "Beam size is " << Angle::ToNiceString(_inversionAlgorithm->BeamSize()) << '\n';
 	}
+	_fitsWriter.SetBeamInfo(
+		_infoPerChannel[currentChannelIndex].beamMaj,
+		_infoPerChannel[currentChannelIndex].beamMin,
+		_infoPerChannel[currentChannelIndex].beamPA);
 		
 	std::cout << "Writing psf image... " << std::flush;
 	const std::string name(getPSFPrefix(currentChannelIndex) + "-psf.fits");
@@ -980,10 +991,17 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 					double* modelImage = _imageAllocator.Allocate(_imgWidth*_imgHeight);
 					_modelImages.Load(modelImage, *curPol, currentChannelIndex, *isImaginary);
 					ModelRenderer renderer(_fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM());
+					double beamMaj = _infoPerChannel[currentChannelIndex].beamMaj;
+					double beamMin = _infoPerChannel[currentChannelIndex].beamMin;
+					double beamPA = _infoPerChannel[currentChannelIndex].beamPA;
+					std::string beamStr =
+						"(beam=" + Angle::ToNiceString(beamMin) + "-" +
+						Angle::ToNiceString(beamMaj) + ", PA=" +
+						Angle::ToNiceString(beamPA) + ")";
 					if(_multiscale || _useMoreSane)
 					{
-						std::cout << "Rendering sources to restored image... " << std::flush;
-						renderer.Restore(restoredImage, modelImage, _imgWidth, _imgHeight, _fitsWriter.BeamSizeMajorAxis(), _fitsWriter.BeamSizeMinorAxis(), _fitsWriter.BeamPositionAngle(), Polarization::StokesI);
+						std::cout << "Rendering sources to restored image " + beamStr + "... " << std::flush;
+						renderer.Restore(restoredImage, modelImage, _imgWidth, _imgHeight, beamMaj, beamMin, beamPA, Polarization::StokesI);
 						std::cout << "DONE\n";
 					}
 					else {
@@ -991,15 +1009,12 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 						// A model cannot hold instrumental pols (xx/xy/yx/yy), hence always use Stokes I here
 						CleanAlgorithm::GetModelFromImage(model, modelImage, _imgWidth, _imgHeight, _fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM(), 0.0, _fitsWriter.Frequency(), Polarization::StokesI);
 						
-						double beamMaj = _fitsWriter.BeamSizeMajorAxis();
-						double beamMin = _fitsWriter.BeamSizeMinorAxis();
-						double beamPA = _fitsWriter.BeamPositionAngle();
 						if(beamMaj == beamMin) {
-							std::cout << "Rendering " << model.SourceCount() << " circular sources to restored image... " << std::flush;
+							std::cout << "Rendering " << model.SourceCount() << " circular sources to restored image " + beamStr + "... " << std::flush;
 							renderer.Restore(restoredImage, _imgWidth, _imgHeight, model, beamMaj, freqLow, freqHigh, Polarization::StokesI);
 						}
 						else {
-							std::cout << "Rendering " << model.SourceCount() << " elliptical sources to restored image... " << std::flush;
+							std::cout << "Rendering " << model.SourceCount() << " elliptical sources to restored image " + beamStr + "... " << std::flush;
 							renderer.Restore(restoredImage, _imgWidth, _imgHeight, model, beamMaj, beamMin, beamPA, freqLow, freqHigh, Polarization::StokesI);
 						}
 						std::cout << "DONE\n";
@@ -1120,7 +1135,8 @@ void WSClean::runFirstInversion(size_t currentChannelIndex, PolarizationEnum pol
 	
 	const bool firstBeforePSF = _isFirstInversion;
 
-	if((_nIter > 0 || _makePSF) && polarization == *_polarizations.begin())
+	bool doMakePSF = (_nIter > 0 || _makePSF) && polarization == *_polarizations.begin();
+	if(doMakePSF)
 		imagePSF(currentChannelIndex, joinedChannelIndex);
 	
 	initFitsWriter(_fitsWriter);
@@ -1132,6 +1148,20 @@ void WSClean::runFirstInversion(size_t currentChannelIndex, PolarizationEnum pol
 	_infoPerChannel[currentChannelIndex].weight = _inversionAlgorithm->ImageWeight();
 	_infoPerChannel[currentChannelIndex].bandStart = _inversionAlgorithm->BandStart();
 	_infoPerChannel[currentChannelIndex].bandEnd = _inversionAlgorithm->BandEnd();
+	if(!doMakePSF)
+	{
+		if(_manualBeamMajorSize == 0.0)
+		{
+			_infoPerChannel[currentChannelIndex].beamMaj = _inversionAlgorithm->BeamSize();
+			_infoPerChannel[currentChannelIndex].beamMin = _inversionAlgorithm->BeamSize();
+			_infoPerChannel[currentChannelIndex].beamPA = 0.0;
+		}
+		else {
+			_infoPerChannel[currentChannelIndex].beamMaj = _manualBeamMajorSize;
+			_infoPerChannel[currentChannelIndex].beamMin = _manualBeamMinorSize;
+			_infoPerChannel[currentChannelIndex].beamPA = _manualBeamPA;
+		}
+	}
 	
 	if(_isGriddingImageSaved && firstBeforePSF && _inversionAlgorithm->HasGriddingCorrectionImage())
 		imageGridding();
@@ -1471,6 +1501,10 @@ void WSClean::writeFits(const string& suffix, const double* image, PolarizationE
 	_fitsWriter.SetPolarization(pol);
 	_fitsWriter.SetFrequency(centreFrequency, bandwidth);
 	_fitsWriter.SetExtraKeyword("WSCIMGWG", _infoPerChannel[channelIndex].weight);
+	_fitsWriter.SetBeamInfo(
+		_infoPerChannel[channelIndex].beamMaj,
+		_infoPerChannel[channelIndex].beamMin,
+		_infoPerChannel[channelIndex].beamPA);
 	size_t polIndex;
 	if(_joinedPolarizationCleaning)
 		polIndex = 0;
