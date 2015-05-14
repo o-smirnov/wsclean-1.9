@@ -12,6 +12,18 @@
 class InversionAlgorithm
 {
 	public:
+		/**
+		 * This specifies several modi how the visibility weights
+		 * (normally stored in the SPECTRUM_WEIGHT column)
+		 * are applied to the data.
+		 */
+		enum VisibilityWeightingMode
+		{
+			NormalVisibilityWeighting,
+			SquaredVisibilityWeighting,
+			UnitVisibilityWeighting
+		};
+		
 		InversionAlgorithm() :
 			_imageWidth(0),
 			_imageHeight(0),
@@ -32,7 +44,9 @@ class InversionAlgorithm
 			_verbose(false),
 			_selection(),
 			_antialiasingKernelSize(7),
-			_overSamplingFactor(63)
+			_overSamplingFactor(63),
+			_normalizeForWeighting(true),
+			_visibilityWeightingMode(NormalVisibilityWeighting)
 		{
 		}
 		virtual ~InversionAlgorithm()
@@ -63,6 +77,8 @@ class InversionAlgorithm
 		size_t OverSamplingFactor() const { return _overSamplingFactor; }
 		bool HasWLimit() const { return _wLimit != 0.0; }
 		double WLimit() const { return _wLimit; }
+		bool NormalizeForWeighting() const { return _normalizeForWeighting; }
+		enum VisibilityWeightingMode VisibilityWeightingMode() const { return _visibilityWeightingMode; }
 		
 		void SetImageWidth(size_t imageWidth)
 		{
@@ -148,6 +164,14 @@ class InversionAlgorithm
 		{
 			_wLimit = wLimit;
 		}
+		void SetNormalizeForWeighting(bool normalizeForWeighting)
+		{
+			_normalizeForWeighting = normalizeForWeighting;
+		}
+		void SetVisibilityWeightingMode(enum VisibilityWeightingMode mode)
+		{
+			_visibilityWeightingMode = mode;
+		}
 		
 		virtual void Invert() = 0;
 		
@@ -196,6 +220,8 @@ class InversionAlgorithm
 		bool _verbose;
 		MSSelection _selection;
 		size_t _antialiasingKernelSize, _overSamplingFactor;
+		bool _normalizeForWeighting;
+		enum VisibilityWeightingMode _visibilityWeightingMode;
 };
 
 #endif

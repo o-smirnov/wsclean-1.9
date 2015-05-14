@@ -505,9 +505,13 @@ void LayeredImager::SampleData(std::complex<float>* data, size_t dataDescId, dou
 	}
 }
 
-void LayeredImager::FinalizeImage(double multiplicationFactor)
+void LayeredImager::FinalizeImage(double multiplicationFactor, bool correctFFTFactor)
 {
 	freeLayeredUVData();
+	if(correctFFTFactor)
+	{
+		multiplicationFactor /= sqrt(_width*_height);
+	}
 	finalizeImage(multiplicationFactor, _imageData);
 	if(_isComplex)
 		finalizeImage(multiplicationFactor, _imageDataImaginary);
