@@ -361,6 +361,10 @@ public:
 			<< _values[2] << ", " << _values[3];
 		return str.str();
 	}
+	void CopyValues(std::complex<double>* values) const
+	{
+		Matrix2x2::Assign(values, _values);
+	}
 private:
 	std::complex<double> _values[4];
 };

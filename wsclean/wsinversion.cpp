@@ -311,7 +311,7 @@ void WSInversion::gridMeasurementSet(MSData &msData)
 				{
 					double lmsqrt = sqrt(1.0-_phaseCentreDL*_phaseCentreDL- _phaseCentreDM*_phaseCentreDM);
 					double shiftFactor = 2.0*M_PI* (newItem.w * (lmsqrt-1.0));
-					rotateVisibilities(curBand, shiftFactor, 1.0/lmsqrt, newItem.data);
+					rotateVisibilities(curBand, shiftFactor, newItem.data);
 				}
 			}
 			else {
@@ -329,6 +329,27 @@ void WSInversion::gridMeasurementSet(MSData &msData)
 				}
 			}
 			msData.msProvider->ReadWeights(weightBuffer.data());
+			switch(VisibilityWeightingMode())
+			{
+				case NormalVisibilityWeighting:
+					// The MS provider has already preweighted the
+					// visibilities for their weight, so we do not
+					// have to do anything.
+					break;
+				case SquaredVisibilityWeighting:
+					for(size_t ch=0; ch!=curBand.ChannelCount(); ++ch)
+						newItem.data[ch] *= weightBuffer[ch];
+					break;
+				case UnitVisibilityWeighting:
+					for(size_t ch=0; ch!=curBand.ChannelCount(); ++ch)
+					{
+						if(weightBuffer[ch] == 0.0)
+							newItem.data[ch] = 0.0;
+						else
+							newItem.data[ch] /= weightBuffer[ch];
+					}
+					break;
+			}
 			switch(Weighting().Mode())
 			{
 				case WeightMode::UniformWeighted:
@@ -586,7 +607,12 @@ void WSInversion::Invert()
 		std::cout << '\n';
 	}
 	
-	_imager->FinalizeImage(1.0/_totalWeight);
+	if(NormalizeForWeighting())
+		_imager->FinalizeImage(1.0/_totalWeight, false);
+	else {
+		std::cout << "Not dividing by normalization factor of " << _totalWeight << ".\n";
+		_imager->FinalizeImage(1.0, true);
+	}
 	
 	if(ImageWidth()!=_actualInversionWidth || ImageHeight()!=_actualInversionHeight)
 	{
@@ -707,14 +733,14 @@ void WSInversion::Predict(double* real, double* imaginary)
 	delete[] msDataVector;
 }
 
-void WSInversion::rotateVisibilities(const BandData &bandData, double shiftFactor, double multFactor, std::complex<float>* dataIter)
+void WSInversion::rotateVisibilities(const BandData &bandData, double shiftFactor, std::complex<float>* dataIter)
 {
 	for(unsigned ch=0; ch!=bandData.ChannelCount(); ++ch)
 	{
 		const double wShiftRad = shiftFactor / bandData.ChannelWavelength(ch);
 		double rotSinD, rotCosD;
 		sincos(wShiftRad, &rotSinD, &rotCosD);
-		float rotSin = rotSinD * multFactor, rotCos = rotCosD * multFactor;
+		float rotSin = rotSinD, rotCos = rotCosD;
 		std::complex<float> v = *dataIter;
 		*dataIter = std::complex<float>(
 			v.real() * rotCos  -  v.imag() * rotSin,

@@ -93,7 +93,7 @@ class LayeredImager
 		
 		void FinishInversionPass();
 		
-		void FinalizeImage(double multiplicationFactor);
+		void FinalizeImage(double multiplicationFactor, bool correctFFTFactor);
 		
 		// Sampling (image to uv) methods
 		void InitializePrediction(const double *image, double multiplicationFactor)

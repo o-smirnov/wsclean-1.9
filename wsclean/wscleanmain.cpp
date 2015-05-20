@@ -108,6 +108,13 @@ int main(int argc, char *argv[])
 			"   only effect when -mgain is set or -predict is given.\n"
 			"-dft-with-beam\n"
 			"   Apply the beam during DFT. Currently only works for LOFAR.\n"
+			"-visibility-weighting-mode [normal/squared/unit]\n"
+			"   Specify visibility weighting modi. Affects how the weights (normally) stored in\n"
+			"   WEIGHT_SPECTRUM column are applied. Useful for estimating e.g. EoR power spectra errors.\n"
+			"   Normally one would use this in combination with -no-normalize-for-weighting.\n"
+			"-no-normalize-for-weighting\n"
+			"   Disable the normalization for the weights, which makes the PSF's peak one. See\n"
+			"   -visibility-weighting-mode. Only useful with natural weighting.\n"
 			"\n"
 			"  ** DATA SELECTION OPTIONS **\n"
 			"-pol <list>\n"
@@ -201,7 +208,7 @@ int main(int argc, char *argv[])
 			"-nofitbeam\n"
 			"   Determine beam shape from longest projected baseline.\n"
 			"-circularbeam\n"
-			"   Force the beam to be circular.\n"
+			"   Force the beam to be circular: bmin will be set to bmaj.\n"
 			"-ellipticalbeam\n"
 			"   Allow the beam to be elliptical. Default.\n";
 		return -1;
@@ -567,6 +574,24 @@ int main(int argc, char *argv[])
 			// This was to test the optimization suggested in Tasse et al., 2013, Appendix C.
 			++argi;
 			wsclean.SetWLimit(atof(argv[argi]));
+		}
+		else if(param == "no-normalize-for-weighting")
+		{
+			wsclean.SetNormalizeForWeighting(false);
+		}
+		else if(param == "visibility-weighting-mode")
+		{
+			++argi;
+			std::string modeStr = argv[argi];
+			boost::to_lower(modeStr);
+			if(modeStr == "normal")
+				wsclean.SetVisibilityWeightingMode(InversionAlgorithm::NormalVisibilityWeighting);
+			else if(modeStr == "squared")
+				wsclean.SetVisibilityWeightingMode(InversionAlgorithm::SquaredVisibilityWeighting);
+			else if(modeStr == "unit")
+				wsclean.SetVisibilityWeightingMode(InversionAlgorithm::UnitVisibilityWeighting);
+			else
+				throw std::runtime_error("Unknown weighting mode: " + modeStr);
 		}
 		else {
 			throw std::runtime_error("Unknown parameter: " + param);

@@ -178,6 +178,8 @@ class FitsWriter : protected FitsIOChecker
 		
 		void CopyDoubleKeywordIfExists(class FitsReader& reader, const char* keywordName);
 		void CopyStringKeywordIfExists(class FitsReader& reader, const char* keywordName);
+		
+		static void MJDToHMS(double mjd, int& hour, int& minutes, int& seconds, int& deciSec);
 	private:
 		template<typename T>
 		static T setNotFiniteToZero(T num)
@@ -198,7 +200,6 @@ class FitsWriter : protected FitsIOChecker
 		std::map<std::string, double> _extraNumKeywords;
 		
 		void julianDateToYMD(double jd, int &year, int &month, int &day) const;
-		void mjdToHMS(double mjd, int& hour, int& minutes, int& seconds, int& deciSec) const;
 		void writeHeaders(fitsfile*& fptr, const std::string& filename, size_t nFreq, size_t nPol) const;
 		void writeImage(fitsfile* fptr, const std::string& filename, const double* image) const;
 		void writeImage(fitsfile* fptr, const std::string& filename, const float* image) const;

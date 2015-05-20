@@ -68,7 +68,9 @@ WSClean::WSClean() :
 	_commandLine(),
 	_inversionWatch(false), _predictingWatch(false), _deconvolutionWatch(false),
 	_isFirstInversion(true), _doReorder(false),
-	_currentIntervalIndex(0), _majorIterationNr(0)
+	_currentIntervalIndex(0), _majorIterationNr(0),
+	_normalizeForWeighting(true),
+	_visibilityWeightingMode(InversionAlgorithm::NormalVisibilityWeighting)
 {
 	_polarizations.insert(Polarization::StokesI);
 }
@@ -690,6 +692,8 @@ void WSClean::prepareInversionAlgorithm(PolarizationEnum polarization)
 	_inversionAlgorithm->SetSelection(_currentPartSelection);
 	_inversionAlgorithm->SetWLimit(_wLimit/100.0);
 	_inversionAlgorithm->SetSmallInversion(_smallInversion);
+	_inversionAlgorithm->SetNormalizeForWeighting(_normalizeForWeighting);
+	_inversionAlgorithm->SetVisibilityWeightingMode(_visibilityWeightingMode);
 }
 
 void WSClean::checkPolarizations()

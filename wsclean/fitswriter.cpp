@@ -97,7 +97,7 @@ void FitsWriter::writeHeaders(fitsfile*& fptr, const std::string& filename, size
 	
   int year, month, day, hour, min, sec, deciSec;
 	julianDateToYMD(_dateObs + 2400000.5, year, month, day);
-	mjdToHMS(_dateObs, hour, min, sec, deciSec);
+	MJDToHMS(_dateObs, hour, min, sec, deciSec);
 	char dateStr[40];
   std::sprintf(dateStr, "%d-%02d-%02dT%02d:%02d:%02d.%01d", year, month, day, hour, min, sec, deciSec);
 	fits_write_key(fptr, TSTRING, "DATE-OBS", (void*) dateStr, "", &status); checkStatus(status, filename);
@@ -246,22 +246,22 @@ void FitsWriter::julianDateToYMD(double jd, int &year, int &month, int &day) con
   year = c-4715-((e-1)>2?1:0);
 }
 
-void FitsWriter::mjdToHMS(double mjd, int& hour, int& minutes, int& seconds, int& deciSec) const
+void FitsWriter::MJDToHMS(double mjd, int& hour, int& minutes, int& seconds, int& deciSec)
 {
-	// It might seem you can calculate each of these immediately
+	// It might seem one can calculate each of these immediately
 	// without adjusting 'mjd', but this way circumvents some
-	// catastrophic round problems, where "0:59.9" might end up
+	// catastrophic rounding problems, where "0:59.9" might end up
 	// as "1:59.9".
 	deciSec = int(fmod(mjd*36000.0 * 24.0, 10.0));
 	mjd -= double(deciSec)/(36000.0 * 24.0);
 	
-	seconds = int(round(fmod(mjd*3600.0 * 24.0, 60.0)));
+	seconds = int(fmod(round(mjd*3600.0 * 24.0), 60.0));
 	mjd -= double(seconds)/(3600.0 * 24.0);
 	
-	minutes = int(round(fmod(mjd*60.0 * 24.0, 60.0)));
+	minutes = int(fmod(round(mjd*60.0 * 24.0), 60.0));
 	mjd -= double(minutes)/(60.0 * 24.0);
 	
-	hour = int(round(fmod(mjd * 24.0, 24.0)));
+	hour = int(fmod(round(mjd * 24.0), 24.0));
 }
 
 void FitsWriter::CopyDoubleKeywordIfExists(FitsReader& reader, const char* keywordName)

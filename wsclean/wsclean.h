@@ -11,6 +11,7 @@
 #include "imagebufferallocator.h"
 #include "stopwatch.h"
 #include "cachedimageset.h"
+#include "inversionalgorithm.h"
 
 #include <set>
 
@@ -105,6 +106,15 @@ public:
 	void RunPredict();
 	
 	bool JoinedFrequencyCleaning() const { return _joinedFrequencyCleaning; }
+	
+	void SetNormalizeForWeighting(bool normalizeForWeighting)
+	{
+		_normalizeForWeighting = normalizeForWeighting;
+	}
+	void SetVisibilityWeightingMode(enum InversionAlgorithm::VisibilityWeightingMode mode)
+	{
+		_visibilityWeightingMode = mode;
+	}
 private:
 	void runIndependentChannel(size_t outChannelIndex);
 	void predictChannel(size_t outChannelIndex);
@@ -259,6 +269,8 @@ private:
 	FitsWriter _fitsWriter;
 	std::vector<MSProvider*> _currentPolMSes;
 	MultiBandData _firstMSBand;
+	bool _normalizeForWeighting;
+	enum InversionAlgorithm::VisibilityWeightingMode _visibilityWeightingMode;
 };
 
 #endif

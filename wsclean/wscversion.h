@@ -4,6 +4,6 @@
 #define WSCLEAN_VERSION_STR  "1.7+purify+lmsqrtfix+crpix2fix"
 #define WSCLEAN_VERSION_MAJOR 1
 #define WSCLEAN_VERSION_MINOR 7
-#define WSCLEAN_VERSION_DATE "2015-05-08"
+#define WSCLEAN_VERSION_DATE "2015-05-20"
 
 #endif
