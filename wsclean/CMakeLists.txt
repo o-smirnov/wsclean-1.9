@@ -87,7 +87,7 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_library(wsclean-lib interface/wscleaninterface.cpp wsclean.cpp casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp cleanalgorithms/cleanalgorithm.cpp cleanalgorithms/joinedclean.cpp cleanalgorithms/moresane.cpp cleanalgorithms/multiscaleclean.cpp cleanalgorithms/simpleclean.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp ${LBEAM_FILES})
+add_library(wsclean-lib interface/wscleaninterface.cpp wsclean.cpp casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp layeredimager.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp wsinversion.cpp deconvolution/deconvolutionalgorithm.cpp deconvolution/joinedclean.cpp deconvolution/moresane.cpp deconvolution/multiscaleclean.cpp deconvolution/simpleclean.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp ${LBEAM_FILES})
 set_target_properties(wsclean-lib PROPERTIES OUTPUT_NAME wsclean)
 
 add_executable(wsclean wscleanmain.cpp)
