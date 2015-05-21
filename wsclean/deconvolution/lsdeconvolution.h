@@ -6,12 +6,12 @@
 
 #include "../uvector.h"
 
-#include "cleanalgorithm.h"
+#include "deconvolutionalgorithm.h"
 #include "imageset.h"
 
 struct LSDeconvolutionData;
 
-class LSDeconvolution : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
+class LSDeconvolution : public TypedDeconvolutionAlgorithm<clean_algorithms::SingleImageSet>
 {
 	public:
 		LSDeconvolution();

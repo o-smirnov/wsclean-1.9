@@ -10,10 +10,10 @@ namespace ao {
 	template<typename T> class lane;
 }
 
-class CleanAlgorithm
+class DeconvolutionAlgorithm
 {
 public:
-	virtual ~CleanAlgorithm() { }
+	virtual ~DeconvolutionAlgorithm() { }
 	
 	void SetMaxNIter(size_t nIter) { _maxIter = nIter; }
 	
@@ -57,7 +57,7 @@ public:
 	
 	static void CalculateFastCleanPSFSize(size_t& psfWidth, size_t& psfHeight, size_t imageWidth, size_t imageHeight);
 	
-	void CopyConfigFrom(const CleanAlgorithm& source)
+	void CopyConfigFrom(const DeconvolutionAlgorithm& source)
 	{
 		_threshold = source._threshold;
 		_subtractionGain = source._subtractionGain;
@@ -79,7 +79,7 @@ public:
 		_multiscaleScaleBias = bias;
 	}
 protected:
-	CleanAlgorithm();
+	DeconvolutionAlgorithm();
 	
 	double _threshold, _subtractionGain, _stopGain, _cleanBorderRatio;
 	double _multiscaleThresholdBias, _multiscaleScaleBias;
@@ -89,12 +89,12 @@ protected:
 };
 
 template<typename ImageSetType>
-class TypedCleanAlgorithm : public CleanAlgorithm
+class TypedDeconvolutionAlgorithm : public DeconvolutionAlgorithm
 {
 public:
 	typedef ImageSetType ImageSet;
 	
-	virtual ~TypedCleanAlgorithm() { }
+	virtual ~TypedDeconvolutionAlgorithm() { }
 	
 	virtual void ExecuteMajorIteration(ImageSetType& dataImage, ImageSetType& modelImage, std::vector<double*> psfImages, size_t width, size_t height, bool& reachedStopGain) = 0;
 	

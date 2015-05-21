@@ -1,4 +1,4 @@
-#include "cleanalgorithm.h"
+#include "deconvolutionalgorithm.h"
 
 #include "../imagecoordinates.h"
 
@@ -7,7 +7,7 @@
 
 #include <unistd.h>
 
-CleanAlgorithm::CleanAlgorithm() :
+DeconvolutionAlgorithm::DeconvolutionAlgorithm() :
 	_threshold(0.0),
 	_subtractionGain(0.1),
 	_stopGain(1.0),
@@ -23,7 +23,7 @@ CleanAlgorithm::CleanAlgorithm() :
 {
 }
 
-void CleanAlgorithm::GetModelFromImage(Model &model, const double* image, size_t width, size_t height, double phaseCentreRA, double phaseCentreDec, double pixelSizeX, double pixelSizeY, double phaseCentreDL, double phaseCentreDM, double spectralIndex, double refFreq, PolarizationEnum polarization)
+void DeconvolutionAlgorithm::GetModelFromImage(Model &model, const double* image, size_t width, size_t height, double phaseCentreRA, double phaseCentreDec, double pixelSizeX, double pixelSizeY, double phaseCentreDL, double phaseCentreDM, double spectralIndex, double refFreq, PolarizationEnum polarization)
 {
 	for(size_t y=0; y!=height; ++y)
 	{
@@ -53,7 +53,7 @@ void CleanAlgorithm::GetModelFromImage(Model &model, const double* image, size_t
 	}
 }
 
-void CleanAlgorithm::ResizeImage(double* dest, size_t newWidth, size_t newHeight, const double* source, size_t width, size_t height)
+void DeconvolutionAlgorithm::ResizeImage(double* dest, size_t newWidth, size_t newHeight, const double* source, size_t width, size_t height)
 {
 	size_t srcStartX = (width - newWidth) / 2, srcStartY = (height - newHeight) / 2;
 	for(size_t y=0; y!=newHeight; ++y)
@@ -64,7 +64,7 @@ void CleanAlgorithm::ResizeImage(double* dest, size_t newWidth, size_t newHeight
 	}
 }
 
-void CleanAlgorithm::RemoveNaNsInPSF(double* psf, size_t width, size_t height)
+void DeconvolutionAlgorithm::RemoveNaNsInPSF(double* psf, size_t width, size_t height)
 {
 	double* endPtr = psf + width*height;
 	while(psf != endPtr)
@@ -74,7 +74,7 @@ void CleanAlgorithm::RemoveNaNsInPSF(double* psf, size_t width, size_t height)
 	}
 }
 
-void CleanAlgorithm::CalculateFastCleanPSFSize(size_t& psfWidth, size_t& psfHeight, size_t imageWidth, size_t imageHeight)
+void DeconvolutionAlgorithm::CalculateFastCleanPSFSize(size_t& psfWidth, size_t& psfHeight, size_t imageWidth, size_t imageHeight)
 {
 	// With 2048 x 2048, the subtraction is already so quick that it is not really required to make the psf smaller
 	if(imageWidth <= 2048)

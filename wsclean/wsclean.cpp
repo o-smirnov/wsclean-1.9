@@ -10,11 +10,11 @@
 
 #include "model/model.h"
 
-#include "cleanalgorithms/cleanalgorithm.h"
-#include "cleanalgorithms/joinedclean.h"
-#include "cleanalgorithms/simpleclean.h"
-#include "cleanalgorithms/moresane.h"
-#include "cleanalgorithms/multiscaleclean.h"
+#include "deconvolution/deconvolutionalgorithm.h"
+#include "deconvolution/joinedclean.h"
+#include "deconvolution/simpleclean.h"
+#include "deconvolution/moresane.h"
+#include "deconvolution/multiscaleclean.h"
 
 #include "msproviders/contiguousms.h"
 
@@ -77,7 +77,7 @@ WSClean::WSClean() :
 
 WSClean::~WSClean()
 {
-	freeCleanAlgorithms();
+	freeDeconvolutionAlgorithms();
 }
 
 void WSClean::initFitsWriter(FitsWriter& writer)
@@ -144,7 +144,7 @@ void WSClean::copyWSCleanKeywords(FitsReader& reader, FitsWriter& writer)
 		writer.CopyDoubleKeywordIfExists(reader, dblKeywords[i]);
 }
 
-void WSClean::setCleanParameters(FitsWriter& writer, const CleanAlgorithm& clean)
+void WSClean::setCleanParameters(FitsWriter& writer, const DeconvolutionAlgorithm& clean)
 {
 	writer.SetExtraKeyword("WSCNITER", clean.MaxNIter());
 	writer.SetExtraKeyword("WSCTHRES", clean.Threshold());
@@ -169,7 +169,7 @@ void WSClean::imagePSF(size_t currentChannelIndex, size_t joinedChannelIndex)
 	_inversionAlgorithm->SetVerbose(_isFirstInversion);
 	_inversionAlgorithm->Invert();
 		
-	CleanAlgorithm::RemoveNaNsInPSF(_inversionAlgorithm->ImageRealResult(), _imgWidth, _imgHeight);
+	DeconvolutionAlgorithm::RemoveNaNsInPSF(_inversionAlgorithm->ImageRealResult(), _imgWidth, _imgHeight);
 	initFitsWriter(_fitsWriter);
 	_psfImages.SetFitsWriter(_fitsWriter);
 	_psfImages.Store(_inversionAlgorithm->ImageRealResult(), *_polarizations.begin(), joinedChannelIndex, false);
@@ -536,16 +536,16 @@ void WSClean::initializeMFSImageWeights()
 		_imageWeights->Save(_prefixName+"-weights.fits");
 }
 
-void WSClean::freeCleanAlgorithms()
+void WSClean::freeDeconvolutionAlgorithms()
 {
-	for(std::vector<CleanAlgorithm*>::iterator caPtr=_cleanAlgorithms.begin(); caPtr!=_cleanAlgorithms.end(); ++caPtr)
+	for(std::vector<DeconvolutionAlgorithm*>::iterator caPtr=_cleanAlgorithms.begin(); caPtr!=_cleanAlgorithms.end(); ++caPtr)
 		delete *caPtr;
 	_cleanAlgorithms.clear();
 }
 
-void WSClean::initializeCleanAlgorithm()
+void WSClean::initializeDeconvolutionAlgorithm()
 {
-	freeCleanAlgorithms();
+	freeDeconvolutionAlgorithms();
 	size_t count = 0;
 	double beamSize = _inversionAlgorithm->BeamSize();
 	if(_useMoreSane)
@@ -887,7 +887,7 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 		_currentPartSelection = selectionBefore;
 	}
 	
-	initializeCleanAlgorithm();
+	initializeDeconvolutionAlgorithm();
 
 	initFitsWriter(_fitsWriter);
 	setCleanParameters(_fitsWriter, *_cleanAlgorithms[0]);
@@ -1011,7 +1011,7 @@ void WSClean::runIndependentChannel(size_t outChannelIndex)
 					else {
 						Model model;
 						// A model cannot hold instrumental pols (xx/xy/yx/yy), hence always use Stokes I here
-						CleanAlgorithm::GetModelFromImage(model, modelImage, _imgWidth, _imgHeight, _fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM(), 0.0, _fitsWriter.Frequency(), Polarization::StokesI);
+						DeconvolutionAlgorithm::GetModelFromImage(model, modelImage, _imgWidth, _imgHeight, _fitsWriter.RA(), _fitsWriter.Dec(), _pixelScaleX, _pixelScaleY, _fitsWriter.PhaseCentreDL(), _fitsWriter.PhaseCentreDM(), 0.0, _fitsWriter.Frequency(), Polarization::StokesI);
 						
 						if(beamMaj == beamMin) {
 							std::cout << "Rendering " << model.SourceCount() << " circular sources to restored image " + beamStr + "... " << std::flush;
@@ -1243,7 +1243,7 @@ void WSClean::performClean(size_t currentChannelIndex, bool& reachedMajorThresho
 	}
 }
 
-void WSClean::performSimpleClean(CleanAlgorithm& cleanAlgorithm, size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr, PolarizationEnum polarization)
+void WSClean::performSimpleClean(DeconvolutionAlgorithm& cleanAlgorithm, size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr, PolarizationEnum polarization)
 {
 	clean_algorithms::SingleImageSet
 		residualImage(_imgWidth*_imgHeight, _imageAllocator),
@@ -1258,8 +1258,8 @@ void WSClean::performSimpleClean(CleanAlgorithm& cleanAlgorithm, size_t currentC
 	_deconvolutionWatch.Start();
 
 	std::vector<double*> psfs(1, psfImage);
-	TypedCleanAlgorithm<clean_algorithms::SingleImageSet>& tAlgorithm =
-		static_cast<TypedCleanAlgorithm<clean_algorithms::SingleImageSet>&>(cleanAlgorithm);
+	TypedDeconvolutionAlgorithm<clean_algorithms::SingleImageSet>& tAlgorithm =
+		static_cast<TypedDeconvolutionAlgorithm<clean_algorithms::SingleImageSet>&>(cleanAlgorithm);
 	tAlgorithm.ExecuteMajorIteration(residualImage, modelImage, psfs, _imgWidth, _imgHeight, reachedMajorThreshold);
 	_deconvolutionWatch.Pause();
 	
@@ -1311,7 +1311,7 @@ void WSClean::performJoinedPolClean(size_t currentChannelIndex, bool& reachedMaj
 	}
 
 	_deconvolutionWatch.Start();
-	static_cast<TypedCleanAlgorithm<clean_algorithms::PolarizedImageSet<PolCount>>&>(*_cleanAlgorithms[0]).ExecuteMajorIteration(residualSet, modelSet, psfImages, _imgWidth, _imgHeight, reachedMajorThreshold);
+	static_cast<TypedDeconvolutionAlgorithm<clean_algorithms::PolarizedImageSet<PolCount>>&>(*_cleanAlgorithms[0]).ExecuteMajorIteration(residualSet, modelSet, psfImages, _imgWidth, _imgHeight, reachedMajorThreshold);
 	_deconvolutionWatch.Pause();
 	
 	_imageAllocator.Free(psfImage);
@@ -1389,7 +1389,7 @@ void WSClean::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majo
 	}
 
 	_deconvolutionWatch.Start();
-	static_cast<TypedCleanAlgorithm<clean_algorithms::MultiImageSet<clean_algorithms::PolarizedImageSet<PolCount>>>&>(*_cleanAlgorithms[0]).ExecuteMajorIteration(residualSet, modelSet, psfImages, _imgWidth, _imgHeight, reachedMajorThreshold);
+	static_cast<TypedDeconvolutionAlgorithm<clean_algorithms::MultiImageSet<clean_algorithms::PolarizedImageSet<PolCount>>>&>(*_cleanAlgorithms[0]).ExecuteMajorIteration(residualSet, modelSet, psfImages, _imgWidth, _imgHeight, reachedMajorThreshold);
 	_deconvolutionWatch.Pause();
 	
 	for(size_t ch=0; ch!=_channelsOut; ++ch)

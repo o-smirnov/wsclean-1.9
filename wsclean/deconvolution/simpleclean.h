@@ -5,7 +5,7 @@
 #include <cmath>
 #include <limits>
 
-#include "cleanalgorithm.h"
+#include "deconvolutionalgorithm.h"
 #include "imageset.h"
 
 //#define FORCE_NON_AVX 1
@@ -14,7 +14,7 @@ namespace ao {
 	template<typename T> class lane;
 }
 
-class SimpleClean : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
+class SimpleClean : public TypedDeconvolutionAlgorithm<clean_algorithms::SingleImageSet>
 {
 	public:
 		static double FindPeakSimple(const double *image, size_t width, size_t height, size_t &x, size_t &y, bool allowNegativeComponents, size_t startY, size_t endY, double borderRatio);

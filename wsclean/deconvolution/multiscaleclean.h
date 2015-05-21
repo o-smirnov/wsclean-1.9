@@ -1,14 +1,14 @@
 #ifndef MULTI_SCALE_CLEAN_H
 #define MULTI_SCALE_CLEAN_H
 
-#include "cleanalgorithm.h"
+#include "deconvolutionalgorithm.h"
 #include "imageset.h"
 #include "simpleclean.h"
 
 #include "../uvector.h"
 
 template<typename ImageSetType>
-class MultiScaleClean : public TypedCleanAlgorithm<ImageSetType>
+class MultiScaleClean : public TypedDeconvolutionAlgorithm<ImageSetType>
 {
 public:
 	MultiScaleClean(double beamSize, double pixelSizeX, double pixelSizeY) :
@@ -42,7 +42,7 @@ private:
 	{
 		// From Cornwell 2008, "Multi-Scale CLEAN deconvolution of radio synthesis images"
 		// S(alpha) = 1.0 - 0.6 alpha / alpha_Max
-		return 1.0 - CleanAlgorithm::_multiscaleScaleBias * (smallerScale / largerScale);
+		return 1.0 - DeconvolutionAlgorithm::_multiscaleScaleBias * (smallerScale / largerScale);
 	}
 	
 	static void shapeFunction(size_t n, ao::uvector<double>& output2d, double scaleSizeInPixels)

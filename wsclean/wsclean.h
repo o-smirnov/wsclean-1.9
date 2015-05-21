@@ -121,7 +121,7 @@ private:
 	
 	void runFirstInversion(size_t outChannelIndex, PolarizationEnum polarization, size_t joinedChannelIndex);
 	void performClean(size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr);
-	void performSimpleClean(class CleanAlgorithm& cleanAlgorithm, size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr, PolarizationEnum polarization);
+	void performSimpleClean(class DeconvolutionAlgorithm& cleanAlgorithm, size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr, PolarizationEnum polarization);
 	template<size_t PolCount>
 	void performJoinedPolClean(size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr);
 	template<size_t PolCount>
@@ -134,13 +134,13 @@ private:
 	void initFitsWriter(class FitsWriter& writer);
 	void copyWSCleanKeywords(FitsReader& reader, FitsWriter& writer);
 	//void copyDoubleKeywordIfExists(FitsReader& reader, FitsWriter& writer, const char* keywordName);
-	void setCleanParameters(class FitsWriter& writer, const class CleanAlgorithm& clean);
+	void setCleanParameters(class FitsWriter& writer, const class DeconvolutionAlgorithm& clean);
 	void updateCleanParameters(class FitsWriter& writer, size_t minorIterationNr, size_t majorIterationNr);
 	void initializeWeightTapers();
 	void initializeImageWeights(const MSSelection& partSelection);
 	void initializeMFSImageWeights();
-	void initializeCleanAlgorithm();
-	void freeCleanAlgorithms();
+	void initializeDeconvolutionAlgorithm();
+	void freeDeconvolutionAlgorithms();
 	MSProvider* initializeMSProvider(size_t filenameIndex, size_t currentChannelIndex, PolarizationEnum polarization);
 	void initializeCurMSProviders(size_t currentChannelIndex, PolarizationEnum polarization);
 	void clearCurMSProviders();
@@ -258,7 +258,7 @@ private:
 	
 	std::unique_ptr<class InversionAlgorithm> _inversionAlgorithm;
 	std::unique_ptr<class ImageWeights> _imageWeights;
-	std::vector<class CleanAlgorithm*> _cleanAlgorithms;
+	std::vector<class DeconvolutionAlgorithm*> _cleanAlgorithms;
 	ao::uvector<bool> _cleanMask;
 	ImageBufferAllocator<double> _imageAllocator;
 	Stopwatch _inversionWatch, _predictingWatch, _deconvolutionWatch;

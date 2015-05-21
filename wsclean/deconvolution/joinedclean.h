@@ -1,7 +1,7 @@
 #ifndef JOINED_CLEAN_H
 #define JOINED_CLEAN_H
 
-#include "cleanalgorithm.h"
+#include "deconvolutionalgorithm.h"
 #include "imageset.h"
 #include "simpleclean.h"
 
@@ -10,7 +10,7 @@ namespace ao {
 }
 
 template<typename ImageSetType>
-class JoinedClean : public TypedCleanAlgorithm<ImageSetType>
+class JoinedClean : public TypedDeconvolutionAlgorithm<ImageSetType>
 {
 public:
 	virtual void ExecuteMajorIteration(ImageSetType& dataImage, ImageSetType& modelImage, std::vector<double*> psfImages, size_t width, size_t height, bool& reachedStopGain);

@@ -3,10 +3,10 @@
 
 #include <string>
 
-#include "cleanalgorithm.h"
+#include "deconvolutionalgorithm.h"
 #include "imageset.h"
 
-class MoreSane : public TypedCleanAlgorithm<clean_algorithms::SingleImageSet>
+class MoreSane : public TypedDeconvolutionAlgorithm<clean_algorithms::SingleImageSet>
 {
 	public:
 		MoreSane(const std::string& moreSaneLocation, const std::string& moresaneArguments) : _moresaneLocation(moreSaneLocation), _moresaneArguments(moresaneArguments)
