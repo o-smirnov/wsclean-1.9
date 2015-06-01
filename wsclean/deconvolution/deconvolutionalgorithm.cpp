@@ -74,7 +74,7 @@ void DeconvolutionAlgorithm::RemoveNaNsInPSF(double* psf, size_t width, size_t h
 	}
 }
 
-void DeconvolutionAlgorithm::CalculateFastCleanPSFSize(size_t& psfWidth, size_t& psfHeight, size_t imageWidth, size_t imageHeight)
+/*void DeconvolutionAlgorithm::CalculateFastCleanPSFSize(size_t& psfWidth, size_t& psfHeight, size_t imageWidth, size_t imageHeight)
 {
 	// With 2048 x 2048, the subtraction is already so quick that it is not really required to make the psf smaller
 	if(imageWidth <= 2048)
@@ -90,4 +90,4 @@ void DeconvolutionAlgorithm::CalculateFastCleanPSFSize(size_t& psfWidth, size_t&
 		psfHeight = 2048;
 	else
 		psfHeight = imageHeight / 2;
-}
+}*/

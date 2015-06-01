@@ -347,10 +347,10 @@ std::string MultiScaleClean<ImageSetType>::peakDescription(const ImageSetType& i
 	return str.str();
 }
 
-template class MultiScaleClean<clean_algorithms::SingleImageSet>;
-template class MultiScaleClean<clean_algorithms::PolarizedImageSet<2>>;
-template class MultiScaleClean<clean_algorithms::PolarizedImageSet<4>>;
+template class MultiScaleClean<deconvolution::SingleImageSet>;
+template class MultiScaleClean<deconvolution::PolarizedImageSet<2>>;
+template class MultiScaleClean<deconvolution::PolarizedImageSet<4>>;
 
-template class MultiScaleClean<clean_algorithms::MultiImageSet<clean_algorithms::SingleImageSet>>;
-template class MultiScaleClean<clean_algorithms::MultiImageSet<clean_algorithms::PolarizedImageSet<2>>>;
-template class MultiScaleClean<clean_algorithms::MultiImageSet<clean_algorithms::PolarizedImageSet<4>>>;
+template class MultiScaleClean<deconvolution::MultiImageSet<deconvolution::SingleImageSet>>;
+template class MultiScaleClean<deconvolution::MultiImageSet<deconvolution::PolarizedImageSet<2>>>;
+template class MultiScaleClean<deconvolution::MultiImageSet<deconvolution::PolarizedImageSet<4>>>;

@@ -35,6 +35,13 @@ void MSProvider::copyWeightedData(std::complex<float>* dest, size_t startChannel
 		}
 	}
 	else {
+		// Copy the right visibilities with conversion if necessary.
+		// Note that many conversions require dividing by two, e.g.
+		// I = (XX + YY)/2. This division is done with weighting, so
+		// weighted I = (w1 XX + w2 YY),
+		// which is given a weight (w1 + w2),
+		// and hence unweighted I = (w1 XX + w2 YY) / (w1 + w2), which if
+		// w1 = w2 results in I = (XX + YY) / 2.
 		switch(polOut)
 		{
 		case Polarization::StokesI: {
@@ -96,8 +103,10 @@ void MSProvider::copyWeightedData(std::complex<float>* dest, size_t startChannel
 					bool flagB = *flagPtr || !std::isfinite(inPtr->real())|| !std::isfinite(inPtr->imag());
 					if(flagA || flagB)
 						dest[ch] = 0.0;
-					else
+					else {
+						// Q = (YY - XX)/2
 						dest[ch] = (*inPtr * (*weightPtr)) - valA;
+					}
 					
 					weightPtr += polCount - polIndexB;
 					inPtr += polCount - polIndexB;
@@ -123,12 +132,12 @@ void MSProvider::copyWeightedData(std::complex<float>* dest, size_t startChannel
 					inPtr += polIndexB - polIndexA;
 					flagPtr += polIndexB - polIndexA;
 					
-					bool flagB = *flagPtr || !std::isfinite(inPtr->real())|| !std::isfinite(inPtr->imag());
+					bool flagB = *flagPtr || !std::isfinite(inPtr->real()) || !std::isfinite(inPtr->imag());
 					if(flagA || flagB)
 						dest[ch] = 0.0;
 					else {
-						// Q = RL LR
-						dest[ch] = valA *  *inPtr * (*weightPtr);
+						// Q = (RL + LR)/2
+						dest[ch] = (*inPtr * (*weightPtr)) + valA;
 					}
 					
 					weightPtr += polCount - polIndexB;
@@ -192,7 +201,7 @@ void MSProvider::copyWeightedData(std::complex<float>* dest, size_t startChannel
 						dest[ch] = 0.0;
 					else {
 						casa::Complex diff = (valA - *inPtr * (*weightPtr));
-						// U = -i (RL - LR)
+						// U = -i (RL - LR)/2
 						dest[ch] = casa::Complex(diff.imag(), -diff.real());
 					}
 					
@@ -259,7 +268,7 @@ void MSProvider::copyWeightedData(std::complex<float>* dest, size_t startChannel
 					if(flagA || flagB)
 						dest[ch] = 0.0;
 					else {
-						// U = RR - LL
+						// V = (RR - LL)/2
 						dest[ch] = valA - *inPtr * (*weightPtr);
 					}
 					
@@ -313,9 +322,9 @@ void MSProvider::copyWeights(NumType* dest, size_t startChannel, size_t endChann
 			}
 			break;
 			case Polarization::StokesQ: {
-				bool hasXY = Polarization::TypeToIndex(Polarization::XX, polsIn, polIndexA);
-				bool hasYX = Polarization::TypeToIndex(Polarization::YY, polsIn, polIndexB);
-				if(!hasXY || !hasYX) {
+				bool hasXX = Polarization::TypeToIndex(Polarization::XX, polsIn, polIndexA);
+				bool hasYY = Polarization::TypeToIndex(Polarization::YY, polsIn, polIndexB);
+				if(!hasXX || !hasYY) {
 					Polarization::TypeToIndex(Polarization::RL, polsIn, polIndexA);
 					Polarization::TypeToIndex(Polarization::LR, polsIn, polIndexB);
 				}
@@ -439,7 +448,6 @@ void MSProvider::reverseCopyData(casa::Array<std::complex<float>>& dest, size_t 
 						}
 						dataIter += polCount;
 					}
-					throw std::runtime_error("Can't store polarization in set (not implemented or conversion not possible)");
 				}
 			}
 			break;
@@ -475,7 +483,6 @@ void MSProvider::reverseCopyData(casa::Array<std::complex<float>>& dest, size_t 
 						}
 						dataIter += polCount;
 					}
-					throw std::runtime_error("Can't store polarization in set (not implemented or conversion not possible)");
 				}
 			}
 			break;
@@ -500,8 +507,8 @@ void MSProvider::reverseCopyData(casa::Array<std::complex<float>>& dest, size_t 
 				}
 				else {
 					// StokesV to circular
-					Polarization::TypeToIndex(Polarization::RL, polsDest, polIndexA);
-					Polarization::TypeToIndex(Polarization::LR, polsDest, polIndexB);
+					Polarization::TypeToIndex(Polarization::RR, polsDest, polIndexA);
+					Polarization::TypeToIndex(Polarization::LL, polsDest, polIndexB);
 					for(size_t ch=0; ch!=selectedChannelCount; ++ch)
 					{
 						if(std::isfinite(source[ch].real()))
@@ -513,7 +520,6 @@ void MSProvider::reverseCopyData(casa::Array<std::complex<float>>& dest, size_t 
 						}
 						dataIter += polCount;
 					}
-					throw std::runtime_error("Can't store polarization in set (not implemented or conversion not possible)");
 				}
 			}
 			break;

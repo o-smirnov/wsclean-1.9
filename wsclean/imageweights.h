@@ -7,7 +7,7 @@
 #include <ms/MeasurementSets/MeasurementSet.h>
 
 #include "uvector.h"
-#include "inversionalgorithm.h"
+//#include "wsclean/inversionalgorithm.h"
 #include "weightmode.h"
 #include "msselection.h"
 

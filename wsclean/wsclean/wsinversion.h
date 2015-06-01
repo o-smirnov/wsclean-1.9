@@ -4,8 +4,8 @@
 #include "inversionalgorithm.h"
 #include "layeredimager.h"
 
-#include "lane.h"
-#include "multibanddata.h"
+#include "../lane.h"
+#include "../multibanddata.h"
 
 #include <complex>
 #include <memory>
@@ -99,7 +99,7 @@ class WSInversion : public InversionAlgorithm
 				void operator=(const MSData &source);
 		};
 		
-		void initializeMeasurementSet(MSProvider& msProvider, MSData &msData);
+		void initializeMeasurementSet(size_t msIndex, MSData &msData);
 		void gridMeasurementSet(MSData &msData);
 		void countSamplesPerLayer(MSData &msData);
 

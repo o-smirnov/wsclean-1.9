@@ -27,8 +27,6 @@ public:
 	
 	void SetStopOnNegativeComponents(bool stopOnNegative) { _stopOnNegativeComponent = stopOnNegative; }
 	
-	void SetResizePSF(bool resizePSF) { _resizePSF = resizePSF; }
-	
 	void SetCleanBorderRatio(double borderRatio) { _cleanBorderRatio = borderRatio; }
 	
 	void SetThreadCount(size_t threadCount) { _threadCount = threadCount; }
@@ -40,7 +38,6 @@ public:
 	double CleanBorderRatio() const { return _cleanBorderRatio; }
 	bool AllowNegativeComponents() const { return _allowNegativeComponents; }
 	bool StopOnNegativeComponents() const { return _allowNegativeComponents; }
-	bool ResizePSF() const { return _resizePSF; }
 	
 	void SetCleanMask(const bool* cleanMask) { _cleanMask = cleanMask; }
 	
@@ -55,7 +52,7 @@ public:
 
 	static void RemoveNaNsInPSF(double* psf, size_t width, size_t height);
 	
-	static void CalculateFastCleanPSFSize(size_t& psfWidth, size_t& psfHeight, size_t imageWidth, size_t imageHeight);
+	//static void CalculateFastCleanPSFSize(size_t& psfWidth, size_t& psfHeight, size_t imageWidth, size_t imageHeight);
 	
 	void CopyConfigFrom(const DeconvolutionAlgorithm& source)
 	{
@@ -67,7 +64,6 @@ public:
 		// skip _iterationNumber
 		_allowNegativeComponents = source._allowNegativeComponents;
 		_stopOnNegativeComponent = source._stopOnNegativeComponent;
-		_resizePSF = source._resizePSF;
 	}
 	
 	void SetMultiscaleThresholdBias(double bias)
@@ -84,7 +80,7 @@ protected:
 	double _threshold, _subtractionGain, _stopGain, _cleanBorderRatio;
 	double _multiscaleThresholdBias, _multiscaleScaleBias;
 	size_t _maxIter, _iterationNumber, _threadCount;
-	bool _allowNegativeComponents, _stopOnNegativeComponent, _resizePSF;
+	bool _allowNegativeComponents, _stopOnNegativeComponent;
 	const bool* _cleanMask;
 };
 

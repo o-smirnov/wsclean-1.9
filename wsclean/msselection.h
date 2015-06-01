@@ -9,6 +9,7 @@ class MSSelection
 public:
 	MSSelection() :
 		_fieldId(0),
+		_bandId(0),
 		_startChannel(0), _endChannel(0),
 		_startTimestep(0), _endTimestep(0),
 		_minUVWInM(0.0), _maxUVWInM(0.0),
@@ -74,6 +75,10 @@ public:
 	{ 
 		_fieldId = fieldId; 
 	}
+	void SetBandId(size_t bandId)
+	{
+		_bandId = bandId;
+	}
 	void SetChannelRange(size_t startChannel, size_t endChannel)
 	{
 		_startChannel = startChannel;
@@ -99,7 +104,7 @@ public:
 	}
 	static MSSelection Everything() { return MSSelection(); }
 private:
-	size_t _fieldId;
+	size_t _fieldId, _bandId;
 	size_t _startChannel, _endChannel;
 	size_t _startTimestep, _endTimestep;
 	double _minUVWInM, _maxUVWInM;

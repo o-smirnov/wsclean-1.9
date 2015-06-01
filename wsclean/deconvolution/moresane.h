@@ -6,7 +6,7 @@
 #include "deconvolutionalgorithm.h"
 #include "imageset.h"
 
-class MoreSane : public TypedDeconvolutionAlgorithm<clean_algorithms::SingleImageSet>
+class MoreSane : public TypedDeconvolutionAlgorithm<deconvolution::SingleImageSet>
 {
 	public:
 		MoreSane(const std::string& moreSaneLocation, const std::string& moresaneArguments) : _moresaneLocation(moreSaneLocation), _moresaneArguments(moresaneArguments)

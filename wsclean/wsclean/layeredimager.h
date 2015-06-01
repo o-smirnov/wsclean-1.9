@@ -1,8 +1,8 @@
 #ifndef LAYERED_IMAGER_H
 #define LAYERED_IMAGER_H
 
-#include "banddata.h"
-#include "multibanddata.h"
+#include "../banddata.h"
+#include "../multibanddata.h"
 
 #include <boost/thread/mutex.hpp>
 

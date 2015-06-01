@@ -81,6 +81,15 @@ class BandData
 			}
 		}
 		
+		double* begin()
+		{ return _channelFrequencies; }
+		double* end()
+		{ return _channelFrequencies+_channelCount; }
+		const double* begin() const
+		{ return _channelFrequencies; }
+		const double* end() const
+		{ return _channelFrequencies+_channelCount; }
+		
 		void Set(size_t channelCount, const double* frequencies)
 		{
 			_channelCount = channelCount;

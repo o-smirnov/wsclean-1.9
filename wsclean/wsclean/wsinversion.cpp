@@ -1,11 +1,12 @@
 #include "wsinversion.h"
-#include "imageweights.h"
-#include "buffered_lane.h"
-#include "fftresampler.h"
-#include "imagebufferallocator.h"
-#include "angle.h"
 
-#include "msproviders/msprovider.h"
+#include "../imageweights.h"
+#include "../buffered_lane.h"
+#include "../fftresampler.h"
+#include "../imagebufferallocator.h"
+#include "../angle.h"
+
+#include "../msproviders/msprovider.h"
 
 #include <ms/MeasurementSets/MeasurementSet.h>
 #include <measures/Measures/MDirection.h>
@@ -52,8 +53,9 @@ WSInversion::WSInversion(ImageBufferAllocator<double>* imageAllocator, size_t th
 	}
 }
 		
-void WSInversion::initializeMeasurementSet(MSProvider& msProvider, WSInversion::MSData& msData)
+void WSInversion::initializeMeasurementSet(size_t msIndex, WSInversion::MSData& msData)
 {
+	MSProvider& msProvider = MeasurementSet(msIndex);
 	msData.msProvider = &msProvider;
 	casa::MeasurementSet& ms(msProvider.MS());
 	if(ms.nrow() == 0) throw std::runtime_error("Table has no rows (no data)");
@@ -68,10 +70,10 @@ void WSInversion::initializeMeasurementSet(MSProvider& msProvider, WSInversion::
 	casa::MPosition ant1Pos = antPosColumn(0);
 	
 	msData.bandData = MultiBandData(ms.spectralWindow(), ms.dataDescription());
-	if(Selection().HasChannelRange())
+	if(Selection(msIndex).HasChannelRange())
 	{
-		msData.startChannel = Selection().ChannelRangeStart();
-		msData.endChannel = Selection().ChannelRangeEnd();
+		msData.startChannel = Selection(msIndex).ChannelRangeStart();
+		msData.endChannel = Selection(msIndex).ChannelRangeEnd();
 		std::cout << "Selected channels: " << msData.startChannel << '-' << msData.endChannel << '\n';
 		const BandData& firstBand = msData.bandData.FirstBand();
 		if(msData.startChannel >= firstBand.ChannelCount() || msData.endChannel > firstBand.ChannelCount()
@@ -106,7 +108,7 @@ void WSInversion::initializeMeasurementSet(MSProvider& msProvider, WSInversion::
 	
 	casa::MSField fTable(ms.field());
 	casa::MDirection::ROScalarColumn phaseDirColumn(fTable, fTable.columnName(casa::MSFieldEnums::PHASE_DIR));
-	casa::MDirection phaseDir = phaseDirColumn(Selection().FieldId());
+	casa::MDirection phaseDir = phaseDirColumn(Selection(msIndex).FieldId());
 	casa::MEpoch curtime = timeColumn(0);
 	casa::MeasFrame frame(ant1Pos, curtime);
 	casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
@@ -537,7 +539,7 @@ void WSInversion::Invert()
 	MSData* msDataVector = new MSData[MeasurementSetCount()];
 	_hasFrequencies = false;
 	for(size_t i=0; i!=MeasurementSetCount(); ++i)
-		initializeMeasurementSet(MeasurementSet(i), msDataVector[i]);
+		initializeMeasurementSet(i, msDataVector[i]);
 	
 	double minW = msDataVector[0].minW;
 	double maxW = msDataVector[0].maxW;
@@ -649,7 +651,7 @@ void WSInversion::Predict(double* real, double* imaginary)
 	MSData* msDataVector = new MSData[MeasurementSetCount()];
 	_hasFrequencies = false;
 	for(size_t i=0; i!=MeasurementSetCount(); ++i)
-		initializeMeasurementSet(MeasurementSet(i), msDataVector[i]);
+		initializeMeasurementSet(i, msDataVector[i]);
 	
 	double minW = msDataVector[0].minW;
 	double maxW = msDataVector[0].maxW;

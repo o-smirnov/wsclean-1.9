@@ -1,5 +1,5 @@
 #include "layeredimager.h"
-#include "imagebufferallocator.h"
+#include "../imagebufferallocator.h"
 
 #include <fftw3.h>
 

@@ -19,7 +19,20 @@ class PartitionedMS : public MSProvider
 public:
 	class Handle;
 	
-	PartitionedMS(const Handle& handle, size_t partIndex, PolarizationEnum polarization);
+	struct ChannelRange
+	{
+		size_t band, start, end;
+		bool operator<(const ChannelRange& rhs) const
+		{
+			if(band < rhs.band) return true;
+			if(band > rhs.band) return false;
+			if(start < rhs.start) return true;
+			if(start > rhs.start) return false;
+			return end < rhs.end;
+		}
+	};
+	
+	PartitionedMS(const Handle& handle, size_t partIndex, PolarizationEnum polarization, size_t bandIndex);
 	virtual ~PartitionedMS();
 	
 	virtual casa::MeasurementSet &MS() { return _ms; }
@@ -46,7 +59,7 @@ public:
 	
 	virtual double StartTime() { return _metaHeader.startTime; }
 	
-	static Handle Partition(const string& msPath, size_t channelParts, class MSSelection& selection, const string& dataColumnName, bool includeWeights, bool includeModel, bool modelUpdateRequired, const std::set<PolarizationEnum>& polsOut, const std::string& temporaryDirectory);
+	static Handle Partition(const string& msPath, const std::vector<ChannelRange>& channels, class MSSelection& selection, const string& dataColumnName, bool includeWeights, bool includeModel, bool modelUpdateRequired, const std::set<PolarizationEnum>& polsOut, const std::string& temporaryDirectory);
 	
 	class Handle {
 	public:
@@ -69,12 +82,12 @@ public:
 	private:
 		struct HandleData
 		{
-			HandleData(const std::string& metaFile, const std::string& msPath, const string& dataColumnName, const std::string& temporaryDirectory, size_t channelParts, bool modelUpdateRequired, const std::set<PolarizationEnum>& polarizations, const MSSelection& selection) :
-			_metaFile(metaFile), _msPath(msPath), _dataColumnName(dataColumnName), _temporaryDirectory(temporaryDirectory), _channelParts(channelParts), _modelUpdateRequired(modelUpdateRequired),
+			HandleData(const std::string& metaFile, const std::string& msPath, const string& dataColumnName, const std::string& temporaryDirectory, const std::vector<ChannelRange>& channels, bool modelUpdateRequired, const std::set<PolarizationEnum>& polarizations, const MSSelection& selection) :
+			_metaFile(metaFile), _msPath(msPath), _dataColumnName(dataColumnName), _temporaryDirectory(temporaryDirectory), _channels(channels), _modelUpdateRequired(modelUpdateRequired),
 			_polarizations(polarizations), _selection(selection), _referenceCount(1) { }
 			
 			std::string _metaFile, _msPath, _dataColumnName, _temporaryDirectory;
-			size_t _channelParts;
+			std::vector<ChannelRange> _channels;
 			bool _modelUpdateRequired;
 			std::set<PolarizationEnum> _polarizations;
 			MSSelection _selection;
@@ -82,8 +95,8 @@ public:
 		} *_data;
 		
 		void decrease();
-		Handle(const std::string& metaFile, const std::string& msPath, const string& dataColumnName, const std::string& temporaryDirectory, size_t channelParts, bool modelUpdateRequired, const std::set<PolarizationEnum>& polarizations, const MSSelection& selection) :
-			_data(new HandleData(metaFile, msPath, dataColumnName, temporaryDirectory, channelParts, modelUpdateRequired, polarizations, selection))
+		Handle(const std::string& metaFile, const std::string& msPath, const string& dataColumnName, const std::string& temporaryDirectory, const std::vector<ChannelRange>& channels, bool modelUpdateRequired, const std::set<PolarizationEnum>& polarizations, const MSSelection& selection) :
+			_data(new HandleData(metaFile, msPath, dataColumnName, temporaryDirectory, channels, modelUpdateRequired, polarizations, selection))
 		{
 		}
 	};
@@ -116,10 +129,11 @@ private:
 	{
 		uint64_t channelCount;
 		uint64_t channelStart;
+		uint32_t bandIndex;
 		bool hasModel, hasWeights;
 	} _partHeader;
 	
-	static std::string getPartPrefix(const std::string& msPath, size_t partIndex, PolarizationEnum pol, const std::string& tempDir);
+	static std::string getPartPrefix(const std::string& msPath, size_t partIndex, PolarizationEnum pol, size_t bandIndex, const std::string& tempDir);
 	static std::string getMetaFilename(const std::string& msPath, const std::string& tempDir);
 };
 

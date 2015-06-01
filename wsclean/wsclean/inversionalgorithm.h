@@ -1,9 +1,9 @@
 #ifndef INVERSION_ALGORITHM_H
 #define INVERSION_ALGORITHM_H
 
-#include "polarizationenum.h"
-#include "msselection.h"
-#include "weightmode.h"
+#include "../polarizationenum.h"
+#include "../msselection.h"
+#include "../weightmode.h"
 
 #include <cmath>
 #include <string>
@@ -42,7 +42,6 @@ class InversionAlgorithm
 			_isComplex(false),
 			_weighting(WeightMode::UniformWeighted),
 			_verbose(false),
-			_selection(),
 			_antialiasingKernelSize(7),
 			_overSamplingFactor(63),
 			_normalizeForWeighting(true),
@@ -59,9 +58,17 @@ class InversionAlgorithm
 		double PixelSizeY() const { return _pixelSizeY; }
 		bool HasWGridSize() const { return _wGridSize != 0; }
 		size_t WGridSize() const { return _wGridSize; }
-		void ClearMeasurementSetList() { _measurementSets.clear(); }
-		class MSProvider &MeasurementSet(size_t index) const { return *_measurementSets[index]; }
+		
+		void ClearMeasurementSetList() { _measurementSets.clear(); _selections.clear(); }
+		class MSProvider& MeasurementSet(size_t index) const { return *_measurementSets[index]; }
+		const MSSelection& Selection(size_t index) const { return _selections[index]; }
 		size_t MeasurementSetCount() const { return _measurementSets.size(); }
+		void AddMeasurementSet(class MSProvider* msProvider, const MSSelection& selection)
+		{
+			_measurementSets.push_back(msProvider);
+			_selections.push_back(selection);
+		}
+		
 		const std::string &DataColumnName() const { return _dataColumnName; }
 		bool DoImagePSF() const { return _doImagePSF; }
 		bool DoSubtractModel() const { return _doSubtractModel; }
@@ -70,7 +77,6 @@ class InversionAlgorithm
 		PolarizationEnum Polarization() const { return _polarization; }
 		WeightMode Weighting() const { return _weighting; }
 		class ImageWeights* PrecalculatedWeightInfo() const { return _precalculatedWeightInfo; }
-		const MSSelection& Selection() const { return _selection; }
 		bool IsComplex() const { return _isComplex; }
 		bool Verbose() const { return _verbose; }
 		size_t AntialiasingKernelSize() const { return _antialiasingKernelSize; }
@@ -103,10 +109,6 @@ class InversionAlgorithm
 		void SetNoWGridSize()
 		{
 			_wGridSize = 0;
-		}
-		void AddMeasurementSet(class MSProvider* msProvider)
-		{
-			_measurementSets.push_back(msProvider);
 		}
 		void SetDataColumnName(const std::string &dataColumnName)
 		{
@@ -143,10 +145,6 @@ class InversionAlgorithm
 		void SetPrecalculatedWeightInfo(class ImageWeights* precalculatedWeightInfo)
 		{ 
 			_precalculatedWeightInfo = precalculatedWeightInfo;
-		}
-		void SetSelection(const MSSelection& selection)
-		{
-			_selection = selection;
 		}
 		void SetVerbose(bool verbose)
 		{
@@ -218,7 +216,7 @@ class InversionAlgorithm
 		bool _isComplex;
 		WeightMode _weighting;
 		bool _verbose;
-		MSSelection _selection;
+		std::vector<MSSelection> _selections;
 		size_t _antialiasingKernelSize, _overSamplingFactor;
 		bool _normalizeForWeighting;
 		enum VisibilityWeightingMode _visibilityWeightingMode;

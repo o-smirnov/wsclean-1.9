@@ -20,7 +20,7 @@
  *   YX = U + iV ;   U = (YX + XY)/2
  *   YY = I + Q  ;   V = -i(YX - XY)/2
  * 
- * These definitions assumes that 'X' and 'Y' are labelled as they are in
+ * These definitions assume that 'X' and 'Y' are labelled as they are in
  * CASA measurement sets and uvfits files, which is NOT the same as what
  * the IEEE definitions tell (X and Y are swapped).
  */

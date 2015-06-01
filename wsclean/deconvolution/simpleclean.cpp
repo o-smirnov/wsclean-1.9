@@ -347,22 +347,6 @@ void SimpleClean::ExecuteMajorIterationST(double *dataImage, double *modelImage,
 
 void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, const double* psfImage, size_t width, size_t height, bool& reachedStopGain)
 {
-	std::vector<double> resizedPsf;
-	size_t psfWidth, psfHeight;
-	if(_resizePSF)
-	{
-		CalculateFastCleanPSFSize(psfWidth, psfHeight, width, height);
-		if(psfWidth != width || psfHeight != height)
-		{
-			resizedPsf.resize(psfWidth * psfHeight);
-			ResizeImage(&resizedPsf[0], psfWidth, psfHeight, psfImage, width, height);
-			psfImage = &resizedPsf[0];
-		}
-	}
-	else {
-		psfWidth = width;
-		psfHeight = height;
-	}
 	if(_stopOnNegativeComponent)
 		_allowNegativeComponents = true;
 	
@@ -392,8 +376,8 @@ void SimpleClean::ExecuteMajorIteration(double* dataImage, double* modelImage, c
 		cleanThreadData.imgWidth = width;
 		cleanThreadData.imgHeight = height;
 		cleanThreadData.dataImage = dataImage;
-		cleanThreadData.psfWidth = psfWidth;
-		cleanThreadData.psfHeight = psfHeight;
+		cleanThreadData.psfWidth = width;
+		cleanThreadData.psfHeight = height;
 		cleanThreadData.psfImage = psfImage;
 		cleanThreadData.startY = (height*i)/_threadCount;
 		cleanThreadData.endY = height*(i+1)/_threadCount;

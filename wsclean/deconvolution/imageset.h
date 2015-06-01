@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace clean_algorithms {
+namespace deconvolution {
 		
 	class SingleImageSet {
 	public:
@@ -139,33 +139,15 @@ namespace clean_algorithms {
 			set.Load(images[0], polarization, freqIndex, false);
 		}
 		
-		void LoadLinear(CachedImageSet& set, size_t freqIndex)
+		void Load(CachedImageSet& set, const std::set<PolarizationEnum>& polarizations, size_t freqIndex)
 		{
-			if(PolCount == 2)
+			std::set<PolarizationEnum>::const_iterator p=polarizations.begin();
+			for(size_t i = 0; i!=PolCount; ++i, ++p)
 			{
-				set.Load(images[0], PolarizationEnum::XX, freqIndex, false);
-				set.Load(images[1], PolarizationEnum::YY, freqIndex, false);
-			}
-			else if(PolCount == 4)
-			{
-				set.Load(images[0], PolarizationEnum::XX, freqIndex, false);
-				set.Load(images[1], PolarizationEnum::XY, freqIndex, false);
-				set.Load(images[2], PolarizationEnum::XY, freqIndex, true);
-				set.Load(images[3], PolarizationEnum::YY, freqIndex, false);
-			}
-		}
-		
-		void LoadStokes(CachedImageSet& set, size_t freqIndex)
-		{
-			if(PolCount == 4)
-			{
-				set.Load(images[0], PolarizationEnum::StokesI, freqIndex, false);
-				set.Load(images[1], PolarizationEnum::StokesQ, freqIndex, false);
-				set.Load(images[2], PolarizationEnum::StokesU, freqIndex, false);
-				set.Load(images[3], PolarizationEnum::StokesV, freqIndex, false);
-			}
-			else {
-				throw std::runtime_error("Can only joinedly clean 4 stokes images at once");
+				if(*p == Polarization::YX)
+					set.Load(images[i], PolarizationEnum::XY, freqIndex, true);
+				else
+					set.Load(images[i], *p, freqIndex, false);
 			}
 		}
 		
@@ -174,33 +156,15 @@ namespace clean_algorithms {
 			set.Store(images[0], polarization, freqIndex, false);
 		}
 		
-		void StoreLinear(CachedImageSet& set, size_t freqIndex) const
+		void Store(CachedImageSet& set, const std::set<PolarizationEnum>& polarizations, size_t freqIndex) const
 		{
-			if(PolCount == 2)
+			std::set<PolarizationEnum>::const_iterator p=polarizations.begin();
+			for(size_t i = 0; i!=PolCount; ++i, ++p)
 			{
-				set.Store(images[0], PolarizationEnum::XX, freqIndex, false);
-				set.Store(images[1], PolarizationEnum::YY, freqIndex, false);
-			}
-			else if(PolCount == 4)
-			{
-				set.Store(images[0], PolarizationEnum::XX, freqIndex, false);
-				set.Store(images[1], PolarizationEnum::XY, freqIndex, false);
-				set.Store(images[2], PolarizationEnum::XY, freqIndex, true);
-				set.Store(images[3], PolarizationEnum::YY, freqIndex, false);
-			}
-		}
-		
-		void StoreStokes(CachedImageSet& set, size_t freqIndex) const
-		{
-			if(PolCount == 4)
-			{
-				set.Store(images[0], PolarizationEnum::StokesI, freqIndex, false);
-				set.Store(images[1], PolarizationEnum::StokesQ, freqIndex, false);
-				set.Store(images[2], PolarizationEnum::StokesU, freqIndex, false);
-				set.Store(images[3], PolarizationEnum::StokesV, freqIndex, false);
-			}
-			else {
-				throw std::runtime_error("Can only joinedly clean 4 stokes images at once");
+				if(*p == Polarization::YX)
+					set.Store(images[i], PolarizationEnum::XY, freqIndex, true);
+				else
+					set.Store(images[i], *p, freqIndex, false);
 			}
 		}
 		
@@ -322,9 +286,9 @@ namespace clean_algorithms {
 			_sets[freqIndex]->Load(set, polarization, freqIndex);
 		}
 		
-		void LoadLinear(CachedImageSet& set, size_t i)
+		void Load(CachedImageSet& set, const std::set<PolarizationEnum>& polarizations, size_t i)
 		{
-			_sets[i]->LoadLinear(set, i);
+			_sets[i]->Load(set, polarizations, i);
 		}
 		
 		void Store(CachedImageSet& set, PolarizationEnum polarization, size_t freqIndex)
@@ -332,19 +296,9 @@ namespace clean_algorithms {
 			_sets[freqIndex]->Store(set, polarization, freqIndex);
 		}
 		
-		void StoreLinear(CachedImageSet& set, size_t i) const
+		void Store(CachedImageSet& set, const std::set<PolarizationEnum>& polarizations, size_t i) const
 		{
-			_sets[i]->StoreLinear(set, i);
-		}
-		
-		void LoadStokes(CachedImageSet& set, size_t i)
-		{
-			_sets[i]->LoadStokes(set, i);
-		}
-		
-		void StoreStokes(CachedImageSet& set, size_t i) const
-		{
-			_sets[i]->StoreStokes(set, i);
+			_sets[i]->Store(set, polarizations, i);
 		}
 		
 		double JoinedValue(size_t index) const

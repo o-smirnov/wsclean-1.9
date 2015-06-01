@@ -1,5 +1,5 @@
 #include "angle.h"
-#include "wsclean.h"
+#include "wsclean/wsclean.h"
 #include "wscversion.h"
 
 #include <boost/algorithm/string.hpp>
@@ -135,8 +135,6 @@ int main(int argc, char *argv[])
 			"   Default: image all channels.\n"
 			"-field <fieldid>\n"
 			"   Image the given field id. Default: first field (id 0).\n"
-			"-imaginarypart\n"
-			"   saves the imaginary part instead of the real part; only sensible for xy/yx. Not the default.\n"
 			"-datacolumn <columnname>\n"
 			"   Default: CORRECTED_DATA if it exists, otherwise DATA will be used.\n"
 			"-maxuvw-m <meters>\n"
@@ -265,22 +263,22 @@ int main(int argc, char *argv[])
 		else if(param == "gain")
 		{
 			++argi;
-			wsclean.SetCleanGain(atof(argv[argi]));
+			wsclean.DeconvolutionInfo().SetGain(atof(argv[argi]));
 		}
 		else if(param == "mgain")
 		{
 			++argi;
-			wsclean.SetCleanMGain(atof(argv[argi]));
+			wsclean.DeconvolutionInfo().SetMGain(atof(argv[argi]));
 		}
 		else if(param == "niter")
 		{
 			++argi;
-			wsclean.SetNIter(atoi(argv[argi]));
+			wsclean.DeconvolutionInfo().SetNIter(atoi(argv[argi]));
 		}
 		else if(param == "threshold")
 		{
 			++argi;
-			wsclean.SetThreshold(atof(argv[argi]));
+			wsclean.DeconvolutionInfo().SetThreshold(atof(argv[argi]));
 		}
 		else if(param == "datacolumn")
 		{
@@ -292,32 +290,28 @@ int main(int argc, char *argv[])
 			++argi;
 			wsclean.SetPolarizations(Polarization::ParseList(argv[argi]));
 		}
-		else if(param == "imaginarypart")
-		{
-			throw std::runtime_error("-imaginarypart is deprecated: imaging xy/yx will always make imaginary part.");
-		}
 		else if(param == "negative")
 		{
-			wsclean.SetAllowNegative(true);
+			wsclean.DeconvolutionInfo().SetAllowNegativeComponents(true);
 		}
 		else if(param == "nonegative")
 		{
-			wsclean.SetAllowNegative(false);
+			wsclean.DeconvolutionInfo().SetAllowNegativeComponents(false);
 		}
 		else if(param == "stopnegative")
 		{
-			wsclean.SetStopOnNegative(true);
+			wsclean.DeconvolutionInfo().SetStopOnNegativeComponents(true);
 		}
 		else if(param == "moresane-ext")
 		{
 			++argi;
-			wsclean.SetUseMoreSane(true);
-			wsclean.SetMoreSaneLocation(argv[argi]);
+			wsclean.DeconvolutionInfo().SetUseMoreSane(true);
+			wsclean.DeconvolutionInfo().SetMoreSaneLocation(argv[argi]);
 		}
 		else if(param == "moresane-arg")
 		{
 			++argi;
-			wsclean.SetMoreSaneArgs(argv[argi]);
+			wsclean.DeconvolutionInfo().SetMoreSaneArgs(argv[argi]);
 		}
 		else if(param == "makepsf")
 		{
@@ -366,10 +360,6 @@ int main(int argc, char *argv[])
 		{
 			wsclean.SetSmallInversion(false);
 		}
-		else if(param == "smallpsf")
-		{
-			wsclean.SetSmallPSF(true);
-		}
 		else if(param == "interval")
 		{
 			wsclean.SetIntervalSelection(atoi(argv[argi+1]), atoi(argv[argi+2]));
@@ -404,17 +394,17 @@ int main(int argc, char *argv[])
 		}
 		else if(param == "multiscale")
 		{
-			wsclean.SetMultiscale(true);
+			wsclean.DeconvolutionInfo().SetMultiscale(true);
 		}
 		else if(param == "multiscale-threshold-bias")
 		{
 			++argi;
-			wsclean.SetMultiscaleThresholdBias(atof(argv[argi]));
+			wsclean.DeconvolutionInfo().SetMultiscaleThresholdBias(atof(argv[argi]));
 		}
 		else if(param == "multiscale-scale-bias")
 		{
 			++argi;
-			wsclean.SetMultiscaleScaleBias(atof(argv[argi]));
+			wsclean.DeconvolutionInfo().SetMultiscaleScaleBias(atof(argv[argi]));
 		}
 		else if(param == "weighting-rank-filter")
 		{
@@ -429,17 +419,17 @@ int main(int argc, char *argv[])
 		else if(param == "cleanborder")
 		{
 			++argi;
-			wsclean.SetCleanBorderRatio(atof(argv[argi])*0.01);
+			wsclean.DeconvolutionInfo().SetCleanBorderRatio(atof(argv[argi])*0.01);
 		}
 		else if(param == "fitsmask")
 		{
 			++argi;
-			wsclean.SetFitsMask(argv[argi]);
+			wsclean.DeconvolutionInfo().SetFitsMask(argv[argi]);
 		}
 		else if(param == "casamask")
 		{
 			++argi;
-			wsclean.SetCASAMask(argv[argi]);
+			wsclean.DeconvolutionInfo().SetCASAMask(argv[argi]);
 		}
 		else if(param == "nomfsweighting")
 		{
@@ -603,7 +593,7 @@ int main(int argc, char *argv[])
 	if(argi == argc)
 		throw std::runtime_error("No input measurement sets given.");
 	
-	wsclean.SetMFSWeighting((wsclean.JoinedFrequencyCleaning() && !noMFSWeighting) || mfsWeighting);
+	wsclean.SetMFSWeighting((wsclean.JoinChannels() && !noMFSWeighting) || mfsWeighting);
 	
 	for(int i=argi; i != argc; ++i)
 		wsclean.AddInputMS(argv[i]);

@@ -1,0 +1,102 @@
+#ifndef DECONVOLUTION_H
+#define DECONVOLUTION_H
+
+#include "../uvector.h"
+#include "../imagebufferallocator.h"
+
+#include <cstring>
+
+#include "deconvolutionalgorithm.h"
+
+class Deconvolution
+{
+public:
+	Deconvolution();
+	~Deconvolution();
+	
+	void Perform(const class ImagingTable& groupTable, bool& reachedMajorThreshold, size_t majorIterationNr);
+	
+	void SetGain(double gain) { _gain = gain; }
+	double Gain() const { return _gain; }
+	
+	void SetMGain(double mGain) { _mGain = mGain; }
+	double MGain() const { return _mGain; }
+	
+	void SetNIter(size_t nIter) { _nIter = nIter; }
+	size_t NIter() const { return _nIter; }
+	
+	void SetThreshold(double threshold) { _threshold = threshold; }
+	double Threshold() const { return _threshold; }
+	
+	void SetCleanBorderRatio(double borderRatio) { _cleanBorderRatio = borderRatio; }
+	
+	void SetFitsMask(const std::string& fitsMask) { _fitsMask = fitsMask; }
+	
+	void SetCASAMask(const std::string& casaMask) { _casaMask = casaMask; }
+	
+	void SetAllowNegativeComponents(bool allowNegative) { _allowNegative = allowNegative; }
+	bool AllowNegativeComponents() const { return _allowNegative; }
+	
+	void SetStopOnNegativeComponents(bool stopOnNegative) { _stopOnNegative = stopOnNegative; }
+	bool StopOnNegativeComponents() const { return _stopOnNegative; }
+	
+	void SetMultiscale(bool multiscale) { _multiscale = multiscale; }
+	void SetMultiscaleThresholdBias(double thresholdBias)
+	{ _multiscaleThresholdBias = thresholdBias; }
+	void SetMultiscaleScaleBias(double scaleBias)
+	{ _multiscaleScaleBias = scaleBias; }
+	void SetUseMoreSane(bool useMoreSane) { _useMoreSane = useMoreSane; }
+	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
+	void SetMoreSaneArgs(const std::string& arguments) { _moreSaneArgs = arguments; }
+	
+	void InitializeDeconvolutionAlgorithm(const ImagingTable& groupTable, PolarizationEnum psfPolarization, ImageBufferAllocator<double>* imageAllocator, size_t imgWidth, size_t imgHeight, double pixelScaleX, double pixelScaleY, size_t outputChannels, double beamSize, size_t threadCount);
+	
+	void InitializeImages(class CachedImageSet& residuals, CachedImageSet& models, CachedImageSet& psfs)
+	{
+		_residualImages = &residuals;
+		_modelImages = &models;
+		_psfImages = &psfs;
+	}
+	
+	void FreeDeconvolutionAlgorithms();
+	
+	DeconvolutionAlgorithm& GetAlgorithm()
+	{
+		return *_cleanAlgorithm;
+	}
+	
+	bool MultiScale() const { return _multiscale; }
+	bool UseMoreSane() const { return _useMoreSane; }
+	bool IsInitialized() const { return _cleanAlgorithm != 0; }
+private:
+	void performSimpleClean(size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr, PolarizationEnum polarization);
+	
+	template<size_t PolCount>
+	void performJoinedPolClean(size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr);
+	
+	template<size_t PolCount>
+	void performJoinedPolFreqClean(bool& reachedMajorThreshold, size_t majorIterationNr);
+	
+	double _threshold, _gain, _mGain;
+	size_t _nIter;
+	bool _allowNegative, _stopOnNegative;
+	bool _multiscale;
+	double _multiscaleThresholdBias, _multiscaleScaleBias;
+	double _cleanBorderRatio;
+	std::string _fitsMask, _casaMask;
+	bool _useMoreSane;
+	std::string _moreSaneLocation, _moreSaneArgs;
+	
+	std::unique_ptr<class DeconvolutionAlgorithm> _cleanAlgorithm;
+	
+	ao::uvector<bool> _cleanMask;
+	
+	size_t _summedCount, _squaredCount;
+	std::set<PolarizationEnum> _polarizations;
+	PolarizationEnum _psfPolarization;
+	size_t _imgWidth, _imgHeight;
+	ImageBufferAllocator<double>* _imageAllocator;
+	CachedImageSet *_psfImages, *_modelImages, *_residualImages;
+};
+
+#endif

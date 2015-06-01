@@ -11,7 +11,10 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <map>
 #include <memory>
+#include <vector>
+
 #include <boost/filesystem/path.hpp>
 
 #include <measures/Measures/MEpoch.h>
@@ -20,7 +23,7 @@
 
 // #define REDUNDANT_VALIDATION 1
 
-PartitionedMS::PartitionedMS(const Handle& handle, size_t partIndex, PolarizationEnum polarization) :
+PartitionedMS::PartitionedMS(const Handle& handle, size_t partIndex, PolarizationEnum polarization, size_t bandIndex) :
 	_metaFile(handle._data->_metaFile),
 	_modelFileMap(0),
 	_currentRow(0),
@@ -34,12 +37,14 @@ PartitionedMS::PartitionedMS(const Handle& handle, size_t partIndex, Polarizatio
 	std::cout << "Opening reordered part " << partIndex << " for " << msPath.data() << '\n';
 	_ms = casa::MeasurementSet(msPath.data());
 	
-	std::string partPrefix = getPartPrefix(msPath.data(), partIndex, polarization, handle._data->_temporaryDirectory);
+	std::string partPrefix = getPartPrefix(msPath.data(), partIndex, polarization, bandIndex, handle._data->_temporaryDirectory);
 	
 	_dataFile.open(partPrefix+".tmp", std::ios::in);
-	if(_dataFile.bad())
+	if(!_dataFile.good())
 		throw std::runtime_error("Error opening temporary data file");
 	_dataFile.read(reinterpret_cast<char*>(&_partHeader), sizeof(PartHeader));
+	if(!_dataFile.good())
+		throw std::runtime_error("Error reading header from file");
 	
 	if(_partHeader.hasModel)
 	{
@@ -192,7 +197,7 @@ void PartitionedMS::ReadWeights(float* buffer)
 	_weightPtrIsOk = false;
 }
 
-std::string PartitionedMS::getPartPrefix(const std::string& msPathStr, size_t partIndex, PolarizationEnum pol, const std::string& tempDir)
+std::string PartitionedMS::getPartPrefix(const std::string& msPathStr, size_t partIndex, PolarizationEnum pol, size_t bandIndex, const std::string& tempDir)
 {
 	boost::filesystem::path
 		msPath(msPathStr),
@@ -247,22 +252,41 @@ string PartitionedMS::getMetaFilename(const string& msPathStr, const std::string
  * - Weights (single, only needed when imaging PSF)
  * - Model, optionally
  */
-PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t channelParts, MSSelection& selection, const string& dataColumnName, bool includeWeights, bool includeModel, bool modelUpdateRequired, const std::set<PolarizationEnum>& polsOut, const std::string& temporaryDirectory)
+PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, const std::vector<ChannelRange>& channels, MSSelection& selection, const string& dataColumnName, bool includeWeights, bool includeModel, bool modelUpdateRequired, const std::set<PolarizationEnum>& polsOut, const std::string& temporaryDirectory)
 {
+	std::set<size_t> bands;
+	size_t channelParts = channels.size();
+	for(size_t i=0;i!=channelParts; ++i)
+		bands.insert(channels[i].band);
 	casa::MeasurementSet ms(msPath);
 
-	std::vector<std::ofstream*> dataFiles(channelParts*polsOut.size()), weightFiles(channelParts*polsOut.size());
+	struct PartitionFiles
+	{
+		std::ofstream
+			*data,
+			*weight;
+	};
+	
+	// Ordered as files[pol x channelpart][band]
+	std::vector<std::map<size_t, PartitionFiles>>
+		files(channelParts*polsOut.size());
+	
 	size_t fileIndex = 0;
 	for(size_t part=0; part!=channelParts; ++part)
 	{
 		for(std::set<PolarizationEnum>::const_iterator p=polsOut.begin(); p!=polsOut.end(); ++p)
 		{
-			std::string partPrefix = getPartPrefix(msPath, part, *p, temporaryDirectory);
-			dataFiles[fileIndex] = new std::ofstream(partPrefix + ".tmp");
-			if(includeWeights)
-				weightFiles[fileIndex] = new std::ofstream(partPrefix + "-w.tmp");
-			dataFiles[fileIndex]->seekp(sizeof(PartHeader), std::ios::beg);
-			++fileIndex;
+			for(std::set<size_t>::const_iterator b=bands.begin();
+					b!=bands.end(); ++b)
+			{
+				PartitionFiles& f = files[fileIndex][*b];
+				std::string partPrefix = getPartPrefix(msPath, part, *p, *b, temporaryDirectory);
+				f.data = new std::ofstream(partPrefix + ".tmp");
+				if(includeWeights)
+					f.weight = new std::ofstream(partPrefix + "-w.tmp");
+				f.data->seekp(sizeof(PartHeader), std::ios::beg);
+				++fileIndex;
+			}
 		}
 	}
 	std::vector<PolarizationEnum> msPolarizations = GetMSPolarizations(ms);
@@ -281,16 +305,7 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 	
 	const casa::IPosition shape(dataColumn.shape(0));
 	const size_t polarizationCount = shape[0];
-	size_t channelCount, channelStart;
-	if(selection.HasChannelRange())
-	{
-		channelCount = selection.ChannelRangeEnd() - selection.ChannelRangeStart();
-		channelStart = selection.ChannelRangeStart();
-	}
-	else {
-		channelCount = shape[1];
-		channelStart = 0;
-	}
+	size_t channelCount = shape[1];
 	
 	bool isWeightDefined;
 	if(ms.isColumn(casa::MSMainEnums::WEIGHT_SPECTRUM))
@@ -351,8 +366,8 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 	timestep = selection.HasInterval() ? selection.IntervalStart() : 0;
 	time = timeColumn(startRow);
 	
-	std::vector<std::complex<float>> dataBuffer(polarizationCount * (1 + channelCount / channelParts));
-	std::vector<float> weightBuffer(polarizationCount * (1 + channelCount / channelParts));
+	std::vector<std::complex<float>> dataBuffer(polarizationCount * channelCount);
+	std::vector<float> weightBuffer(polarizationCount * channelCount);
 	
 	casa::Array<std::complex<float>> dataArray(shape);
 	casa::Array<bool> flagArray(shape);
@@ -392,21 +407,23 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 			for(size_t part=0; part!=channelParts; ++part)
 			{
 				size_t
-					partStartCh = channelStart + channelCount*part/channelParts,
-					partEndCh = channelStart + channelCount*(part+1)/channelParts;
+					band = channels[part].band,
+					partStartCh = channels[part].start,
+					partEndCh = channels[part].end;
 				
 				for(std::set<PolarizationEnum>::const_iterator p=polsOut.begin(); p!=polsOut.end(); ++p)
 				{
+					PartitionFiles& f = files[fileIndex][band];
 					copyWeightedData(dataBuffer.data(), partStartCh, partEndCh, msPolarizations, dataArray, weightArray, flagArray, *p);
-					dataFiles[fileIndex]->write(reinterpret_cast<char*>(dataBuffer.data()), (partEndCh - partStartCh) * sizeof(std::complex<float>));
-					if(dataFiles[fileIndex]->bad())
+					f.data->write(reinterpret_cast<char*>(dataBuffer.data()), (partEndCh - partStartCh) * sizeof(std::complex<float>));
+					if(f.data->bad())
 						throw std::runtime_error("Error writing to temporary data file");
 					
 					if(includeWeights)
 					{
 						copyWeights(weightBuffer.data(), partStartCh, partEndCh, msPolarizations, dataArray, weightArray, flagArray, *p);
-						weightFiles[fileIndex]->write(reinterpret_cast<char*>(weightBuffer.data()), (partEndCh - partStartCh) * sizeof(float));
-						if(weightFiles[fileIndex]->bad())
+						f.weight->write(reinterpret_cast<char*>(weightBuffer.data()), (partEndCh - partStartCh) * sizeof(float));
+						if(f.weight->bad())
 							throw std::runtime_error("Error writing to temporary weights file");
 					}
 					++fileIndex;
@@ -422,30 +439,32 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 	header.hasModel = includeModel;
 	header.hasWeights = includeWeights;
 	fileIndex = 0;
-	memset(reinterpret_cast<char*>(dataBuffer.data()), 0, sizeof(std::complex<float>)*(1 + channelCount / channelParts));
+	dataBuffer.assign(channelCount, 0.0);
 	std::unique_ptr<ProgressBar> progress2;
 	if(includeModel)
 		progress2.reset(new ProgressBar("Initializing model visibilities"));
 	for(size_t part=0; part!=channelParts; ++part)
 	{
-		header.channelStart = channelStart + channelCount*part/channelParts,
-		header.channelCount = (channelStart + channelCount*(part+1)/channelParts) - header.channelStart;
+		header.channelStart = channels[part].start,
+		header.channelCount = channels[part].end - header.channelStart;
+		header.bandIndex = channels[part].band;
 		for(std::set<PolarizationEnum>::const_iterator p=polsOut.begin(); p!=polsOut.end(); ++p)
 		{
-			dataFiles[fileIndex]->seekp(0, std::ios::beg);
-			dataFiles[fileIndex]->write(reinterpret_cast<char*>(&header), sizeof(PartHeader));
-			if(dataFiles[fileIndex]->bad())
+			PartitionFiles& f = files[fileIndex][header.bandIndex];
+			f.data->seekp(0, std::ios::beg);
+			f.data->write(reinterpret_cast<char*>(&header), sizeof(PartHeader));
+			if(f.data->bad())
 				throw std::runtime_error("Error writing to temporary data file");
 			
-			delete dataFiles[fileIndex];
+			delete f.data;
 			if(includeWeights)
-				delete weightFiles[fileIndex];
+				delete f.weight;
 			++fileIndex;
 			
 			// If model is requested, fill model file with zeros
 			if(includeModel)
 			{
-				std::string partPrefix = getPartPrefix(msPath, part, *p, temporaryDirectory);
+				std::string partPrefix = getPartPrefix(msPath, part, *p, header.bandIndex, temporaryDirectory);
 				std::ofstream modelFile(partPrefix + "-m.tmp");
 				for(size_t i=0; i!=selectedRowCount; ++i)
 				{
@@ -457,7 +476,7 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, size_t chan
 	}
 	progress2.reset();
 	
-	return Handle(metaFilename, msPath, dataColumnName, temporaryDirectory, channelParts, modelUpdateRequired, polsOut, selection);
+	return Handle(metaFilename, msPath, dataColumnName, temporaryDirectory, channels, modelUpdateRequired, polsOut, selection);
 }
 
 void PartitionedMS::unpartition(const PartitionedMS::Handle& handle)
@@ -469,7 +488,8 @@ void PartitionedMS::unpartition(const PartitionedMS::Handle& handle)
 	std::vector<char> msPath(metaHeader.filenameLength+1, char(0));
 	metaFile.read(msPath.data(), metaHeader.filenameLength);
 	
-	std::ifstream firstDataFile(getPartPrefix(msPath.data(), 0, *pols.begin(), handle._data->_temporaryDirectory)+".tmp", std::ios::in);
+	ChannelRange firstRange = handle._data->_channels[0];
+	std::ifstream firstDataFile(getPartPrefix(msPath.data(), 0, *pols.begin(), firstRange.band, handle._data->_temporaryDirectory)+".tmp", std::ios::in);
 	if(firstDataFile.bad())
 		throw std::runtime_error("Error opening temporary data file");
 	PartHeader firstPartHeader;
@@ -477,14 +497,15 @@ void PartitionedMS::unpartition(const PartitionedMS::Handle& handle)
 	
 	if(firstPartHeader.hasModel)
 	{
-		const size_t channelParts = handle._data->_channelParts;
+		const size_t channelParts = handle._data->_channels.size();
 		std::vector<std::ifstream*> modelFiles(channelParts*pols.size()), weightFiles(channelParts*pols.size());
 		size_t fileIndex = 0;
 		for(size_t part=0; part!=channelParts; ++part)
 		{
+			size_t band = handle._data->_channels[part].band;
 			for(std::set<PolarizationEnum>::const_iterator p=pols.begin(); p!=pols.end(); ++p)
 			{
-				std::string partPrefix = getPartPrefix(msPath.data(), part, *p, handle._data->_temporaryDirectory);
+				std::string partPrefix = getPartPrefix(msPath.data(), part, *p, band, handle._data->_temporaryDirectory);
 				modelFiles[fileIndex] = new std::ifstream(partPrefix + "-m.tmp");
 				if(firstPartHeader.hasWeights)
 					weightFiles[fileIndex] = new std::ifstream(partPrefix + "-w.tmp");
@@ -594,11 +615,11 @@ void PartitionedMS::Handle::decrease()
 		//std::ifstream metaFile(_metaFile);
 		//metaFile.read(reinterpret_cast<char*>(&metaHeader), sizeof(MetaHeader));
 		
-		for(size_t part=0; part!=_data->_channelParts; ++part)
+		for(size_t part=0; part!=_data->_channels.size(); ++part)
 		{
 			for(std::set<PolarizationEnum>::const_iterator p=_data->_polarizations.begin(); p!=_data->_polarizations.end(); ++p)
 			{
-				std::string prefix = getPartPrefix(_data->_msPath, part, *p, _data->_temporaryDirectory);
+				std::string prefix = getPartPrefix(_data->_msPath, part, *p, _data->_channels[part].band, _data->_temporaryDirectory);
 				std::remove((prefix + ".tmp").c_str());
 				std::remove((prefix + "-w.tmp").c_str());
 				std::remove((prefix + "-m.tmp").c_str());

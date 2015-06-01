@@ -11,7 +11,7 @@
 
 struct LSDeconvolutionData;
 
-class LSDeconvolution : public TypedDeconvolutionAlgorithm<clean_algorithms::SingleImageSet>
+class LSDeconvolution : public TypedDeconvolutionAlgorithm<deconvolution::SingleImageSet>
 {
 	public:
 		LSDeconvolution();
