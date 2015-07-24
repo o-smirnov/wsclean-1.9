@@ -1,13 +1,12 @@
 #ifndef DFT_PREDICTION_ALGORITHM_H
 #define DFT_PREDICTION_ALGORITHM_H
-
-#include "imagebufferallocator.h"
+#include "banddata.h"
+#include "matrix2x2.h"
 #include "polarizationenum.h"
 #include "uvector.h"
-#include "matrix2x2.h"
 
+#include "wsclean/imagebufferallocator.h"
 #include "lofar/lbeamevaluator.h"
-#include "banddata.h"
 
 #include <vector>
 #include <complex>

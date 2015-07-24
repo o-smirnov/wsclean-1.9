@@ -7,14 +7,14 @@
 #include "../msselection.h"
 #include "../polarizationenum.h"
 #include "../weightmode.h"
-#include "../imagebufferallocator.h"
 #include "../stopwatch.h"
-#include "../cachedimageset.h"
 
 #include "../deconvolution/deconvolution.h"
 
-#include "layeredimager.h"
+#include "cachedimageset.h"
+#include "wstackinggridder.h"
 #include "inversionalgorithm.h"
+#include "imagebufferallocator.h"
 #include "imagingtable.h"
 
 #include <set>
@@ -34,7 +34,7 @@ public:
 	void SetPolarizations(const std::set<PolarizationEnum>& polarizations) { _polarizations = polarizations; }
 	void SetMakePSF(bool makePSF) { _makePSF = makePSF; }
 	void SetPrefixName(const std::string& prefixName) { _prefixName = prefixName; }
-	void SetGridMode(LayeredImager::GridModeEnum gridMode) { _gridMode = gridMode; }
+	void SetGridMode(WStackingGridder::GridModeEnum gridMode) { _gridMode = gridMode; }
 	//void SetSmallPSF(bool smallPSF) { _smallPSF = smallPSF; }
 	void SetSmallInversion(bool smallInversion) { _smallInversion = smallInversion; }
 	void SetIntervalSelection(size_t startTimestep, size_t endTimestep) {
@@ -230,7 +230,7 @@ private:
 	bool _smallInversion, _makePSF, _isWeightImageSaved, _isUVImageSaved, _isGriddingImageSaved, _dftPrediction, _dftWithBeam;
 	std::string _temporaryDirectory;
 	bool _forceReorder, _forceNoReorder, _modelUpdateRequired, _mfsWeighting;
-	enum LayeredImager::GridModeEnum _gridMode;
+	enum WStackingGridder::GridModeEnum _gridMode;
 	std::vector<std::string> _filenames;
 	std::string _commandLine;
 	std::vector<double> _inputChannelFrequencies;

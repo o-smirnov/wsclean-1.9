@@ -49,7 +49,8 @@ class ModelSource
 		
 		bool operator<(const ModelSource &rhs) const
 		{
-			return _components[0] < rhs._components[0];
+			return TotalFlux(Polarization::StokesI)
+				< rhs.TotalFlux(Polarization::StokesI);
 		}
 		
 		void operator+=(const ModelComponent& rhs)
@@ -131,6 +132,14 @@ class ModelSource
 				flux += i->SED().FluxAtFrequency(frequency, polarization);
 			
 			return flux;
+		}
+		
+		double TotalFlux(PolarizationEnum polarization) const
+		{
+			if(_components.empty())
+				return 0.0;
+			else
+				return TotalFlux(begin()->SED().ReferenceFrequencyHz(), polarization);
 		}
 		
 		size_t ComponentCount() const { return _components.size(); }

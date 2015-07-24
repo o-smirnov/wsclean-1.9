@@ -302,6 +302,10 @@ int main(int argc, char *argv[])
 		{
 			wsclean.DeconvolutionInfo().SetStopOnNegativeComponents(true);
 		}
+		else if(param == "iuwt")
+		{
+			wsclean.DeconvolutionInfo().SetUseIUWT(true);
+		}
 		else if(param == "moresane-ext")
 		{
 			++argi;
@@ -346,9 +350,9 @@ int main(int argc, char *argv[])
 			std::string gridModeStr = argv[argi];
 			boost::to_lower(gridModeStr);
 			if(gridModeStr == "kb" || gridModeStr == "kaiserbessel" || gridModeStr == "kaiser-bessel")
-				wsclean.SetGridMode(LayeredImager::KaiserBessel);
+				wsclean.SetGridMode(WStackingGridder::KaiserBessel);
 			else if(gridModeStr == "nn" || gridModeStr == "nearestneighbour")
-				wsclean.SetGridMode(LayeredImager::NearestNeighbour);
+				wsclean.SetGridMode(WStackingGridder::NearestNeighbour);
 			else
 				throw std::runtime_error("Invalid gridding mode: should be either kb (Kaiser-Bessel) or nn (NearestNeighbour)");
 		}

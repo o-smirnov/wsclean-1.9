@@ -10,6 +10,7 @@ find_library(CASA_CASA_LIB casa_casa REQUIRED)
 find_library(CASA_MEASURES_LIB casa_measures REQUIRED)
 find_library(CASA_FITS_LIB casa_fits REQUIRED)
 find_library(FFTW3_LIB fftw3 REQUIRED)
+find_library(FFTW3_THREADS_LIB fftw3_threads REQUIRED)
 find_package(Boost COMPONENTS filesystem thread system REQUIRED)
 find_library(PTHREAD_LIB pthread REQUIRED)
 find_library(FITSIO_LIB cfitsio REQUIRED)
@@ -87,20 +88,30 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_library(wsclean-lib casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp deconvolution/deconvolution.cpp deconvolution/deconvolutionalgorithm.cpp deconvolution/joinedclean.cpp deconvolution/moresane.cpp deconvolution/multiscaleclean.cpp deconvolution/simpleclean.cpp interface/wscleaninterface.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp wsclean/imagingtable.cpp wsclean/layeredimager.cpp wsclean/wsclean.cpp wsclean/wsinversion.cpp ${LBEAM_FILES})
+add_library(wsclean-lib casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fftwmultithreadenabler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp deconvolution/deconvolution.cpp deconvolution/deconvolutionalgorithm.cpp deconvolution/joinedclean.cpp deconvolution/moresane.cpp deconvolution/multiscaleclean.cpp deconvolution/simpleclean.cpp interface/wscleaninterface.cpp iuwt/imageanalysis.cpp iuwt/iuwtdecomposition.cpp iuwt/iuwtdeconvolutionalgorithm.cpp iuwt/iuwtmask.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp wsclean/imagingtable.cpp wsclean/wsclean.cpp wsclean/wsmsgridder.cpp wsclean/wstackinggridder.cpp ${LBEAM_FILES})
 set_target_properties(wsclean-lib PROPERTIES OUTPUT_NAME wsclean)
 
 add_executable(wsclean wscleanmain.cpp)
-target_link_libraries(wsclean wsclean-lib ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${GSL_CBLAS_LIB} ${PTHREAD_LIB} ${LBEAM_LIBS})
+target_link_libraries(wsclean wsclean-lib ${CASA_LIBS} ${FFTW3_LIB} ${FFTW3_THREADS_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${GSL_CBLAS_LIB} ${PTHREAD_LIB} ${LBEAM_LIBS})
 
 add_executable(purifyexample EXCLUDE_FROM_ALL interface/purifyexample.c)
-target_link_libraries(purifyexample wsclean-lib ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${GSL_CBLAS_LIB} ${LBEAM_LIBS})
+target_link_libraries(purifyexample wsclean-lib ${CASA_LIBS} ${FFTW3_LIB} ${FFTW3_THREADS_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${GSL_CBLAS_LIB} ${LBEAM_LIBS})
 
 set_target_properties(wsclean PROPERTIES COMPILE_FLAGS "-std=c++0x")
 set_target_properties(wsclean-lib PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
-#target_link_libraries(wsclean ${CASA_LIBS} ${FFTW3_LIB} ${Boost_FILESYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${FITSIO_LIB} ${GSL_LIB} ${CBLAS_LIB} ${PTHREAD_LIB} ${LBEAM_LIBS})
-
 install(TARGETS wsclean DESTINATION bin)
 install(TARGETS wsclean-lib DESTINATION lib)
 install(FILES interface/wscleaninterface.h DESTINATION include)
+
+# add target to generate API documentation with Doxygen
+find_package(Doxygen)
+
+if(DOXYGEN_FOUND)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+  add_custom_target(doc
+    ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Generating API documentation with Doxygen" VERBATIM)
+
+endif(DOXYGEN_FOUND)

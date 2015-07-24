@@ -1,15 +1,14 @@
-#include "layeredimager.h"
-#include "../imagebufferallocator.h"
+#include "wstackinggridder.h"
+#include "imagebufferallocator.h"
 
 #include <fftw3.h>
 
 #include <iostream>
 #include <fstream>
-#include <stack>
 
 #include <boost/thread/thread.hpp>
 
-LayeredImager::LayeredImager(size_t width, size_t height, double pixelSizeX, double pixelSizeY, size_t fftThreadCount, ImageBufferAllocator<double>* allocator, size_t kernelSize, size_t overSamplingFactor) :
+WStackingGridder::WStackingGridder(size_t width, size_t height, double pixelSizeX, double pixelSizeY, size_t fftThreadCount, ImageBufferAllocator<double>* allocator, size_t kernelSize, size_t overSamplingFactor) :
 	_width(width),
 	_height(height),
 	_pixelSizeX(pixelSizeX),
@@ -18,7 +17,7 @@ LayeredImager::LayeredImager(size_t width, size_t height, double pixelSizeX, dou
 	_phaseCentreDM(0.0),
 	_isComplex(false),
 	_imageConjugatePart(false),
-	_gridMode(NearestNeighbour),
+	_gridMode(KaiserBessel),
 	_overSamplingFactor(overSamplingFactor),
 	_kernelSize(kernelSize),
 	_imageData(fftThreadCount),
@@ -29,7 +28,7 @@ LayeredImager::LayeredImager(size_t width, size_t height, double pixelSizeX, dou
 	makeKernels();
 }
 
-LayeredImager::~LayeredImager()
+WStackingGridder::~WStackingGridder()
 {
 	for(size_t i=0; i!=_nFFTThreads; ++i)
 	{
@@ -40,7 +39,7 @@ LayeredImager::~LayeredImager()
 	fftw_cleanup();
 }
 
-void LayeredImager::PrepareWLayers(size_t nWLayers, double maxMem, double minW, double maxW)
+void WStackingGridder::PrepareWLayers(size_t nWLayers, double maxMem, double minW, double maxW)
 {
 	_minW = minW;
 	_maxW = maxW;
@@ -87,7 +86,7 @@ void LayeredImager::PrepareWLayers(size_t nWLayers, double maxMem, double minW, 
 	_curLayerRangeIndex = 0;
 }
 
-void LayeredImager::initializeLayeredUVData(size_t n)
+void WStackingGridder::initializeLayeredUVData(size_t n)
 {
 	while(_layeredUVData.size() > n)
 	{
@@ -98,7 +97,7 @@ void LayeredImager::initializeLayeredUVData(size_t n)
 		_layeredUVData.push_back(_imageBufferAllocator->AllocateComplex(_width * _height));
 }
 
-void LayeredImager::StartInversionPass(size_t passIndex)
+void WStackingGridder::StartInversionPass(size_t passIndex)
 {
 	initializeSqrtLMLookupTable();
 	
@@ -109,7 +108,7 @@ void LayeredImager::StartInversionPass(size_t passIndex)
 		memset(_layeredUVData[i], 0, _width*_height * sizeof(double)*2);
 }
 
-void LayeredImager::StartPredictionPass(size_t passIndex)
+void WStackingGridder::StartPredictionPass(size_t passIndex)
 {
 	initializeSqrtLMLookupTableForSampling();
 	
@@ -125,11 +124,11 @@ void LayeredImager::StartPredictionPass(size_t passIndex)
 	boost::mutex mutex;
 	boost::thread_group threadGroup;
 	for(size_t i=0; i!=_nFFTThreads; ++i)
-		threadGroup.add_thread(new boost::thread(&LayeredImager::fftToUVThreadFunction, this, &mutex, &layers));
+		threadGroup.add_thread(new boost::thread(&WStackingGridder::fftToUVThreadFunction, this, &mutex, &layers));
 	threadGroup.join_all();
 }
 
-void LayeredImager::fftToImageThreadFunction(boost::mutex *mutex, std::stack<size_t> *tasks, size_t threadIndex)
+void WStackingGridder::fftToImageThreadFunction(boost::mutex *mutex, std::stack<size_t> *tasks, size_t threadIndex)
 {
 	const size_t imgSize = _width * _height;
 	std::complex<double> *fftwIn = _imageBufferAllocator->AllocateComplex(imgSize);
@@ -171,7 +170,7 @@ void LayeredImager::fftToImageThreadFunction(boost::mutex *mutex, std::stack<siz
 	_imageBufferAllocator->Free(fftwOut);
 }
 
-void LayeredImager::fftToUVThreadFunction(boost::mutex *mutex, std::stack<size_t> *tasks)
+void WStackingGridder::fftToUVThreadFunction(boost::mutex *mutex, std::stack<size_t> *tasks)
 {
 	const size_t imgSize = _width * _height;
 	std::complex<double> *fftwIn = _imageBufferAllocator->AllocateComplex(imgSize);
@@ -213,7 +212,7 @@ void LayeredImager::fftToUVThreadFunction(boost::mutex *mutex, std::stack<size_t
 	_imageBufferAllocator->Free(fftwOut);
 }
 
-void LayeredImager::FinishInversionPass()
+void WStackingGridder::FinishInversionPass()
 {
 	size_t layerOffset = layerRangeStart(_curLayerRangeIndex);
 	size_t nPlanes = layerRangeStart(_curLayerRangeIndex+1) - layerOffset;
@@ -224,11 +223,11 @@ void LayeredImager::FinishInversionPass()
 	boost::mutex mutex;
 	boost::thread_group threadGroup;
 	for(size_t i=0; i!=_nFFTThreads; ++i)
-		threadGroup.add_thread(new boost::thread(&LayeredImager::fftToImageThreadFunction, this, &mutex, &planes, i));
+		threadGroup.add_thread(new boost::thread(&WStackingGridder::fftToImageThreadFunction, this, &mutex, &planes, i));
 	threadGroup.join_all();
 }
 
-void LayeredImager::makeKernels()
+void WStackingGridder::makeKernels()
 {
 	_griddingKernels.resize(_overSamplingFactor * _overSamplingFactor);
 	_1dKernel.resize(_kernelSize*_overSamplingFactor);
@@ -257,7 +256,7 @@ void LayeredImager::makeKernels()
 	}
 }
 
-void LayeredImager::makeKernel(std::vector<double> &kernel, double alpha, size_t overSamplingFactor)
+void WStackingGridder::makeKernel(std::vector<double> &kernel, double alpha, size_t overSamplingFactor)
 {
 	size_t
 		n = kernel.size(),
@@ -279,7 +278,7 @@ void LayeredImager::makeKernel(std::vector<double> &kernel, double alpha, size_t
 		kernel[i] = kernel[n-1-i];
 }
 
-double LayeredImager::bessel0(double x, double precision)
+double WStackingGridder::bessel0(double x, double precision)
 {
 	// Calculate I_0 = SUM of m 0 -> inf [ (x/2)^(2m) ]
 	// This is the unnormalized bessel function of order 0.
@@ -296,21 +295,7 @@ double LayeredImager::bessel0(double x, double precision)
 	return s;
 }
 
-void LayeredImager::AddData(const std::complex<float>* data, size_t dataDescId, double uInM, double vInM, double wInM)
-{
-	const BandData& curBand = _bandData[dataDescId];
-	for(size_t ch=0; ch!=curBand.ChannelCount(); ++ch)
-	{
-		double
-			wavelength = curBand.ChannelWavelength(ch),
-			u = uInM / wavelength,
-			v = vInM / wavelength,
-			w = wInM / wavelength;
-		AddDataSample(data[ch], u, v, w);
-	}
-}
-
-void LayeredImager::AddDataSample(std::complex<float> sample, double uInLambda, double vInLambda, double wInLambda)
+void WStackingGridder::AddDataSample(std::complex<float> sample, double uInLambda, double vInLambda, double wInLambda)
 {
  	const size_t
 		layerOffset = layerRangeStart(_curLayerRangeIndex),
@@ -402,110 +387,107 @@ void LayeredImager::AddDataSample(std::complex<float> sample, double uInLambda, 
 	}
 }
 
-void LayeredImager::SampleData(std::complex<float>* data, size_t dataDescId, double uInM, double vInM, double wInM)
+void WStackingGridder::SampleDataSample(std::complex<float>& value, double uInLambda, double vInLambda, double wInLambda)
 {
- 	const size_t
+	const size_t
 		layerOffset = layerRangeStart(_curLayerRangeIndex),
 		layerRangeEnd = layerRangeStart(_curLayerRangeIndex+1);
-	const BandData& curBand(_bandData[dataDescId]);
-	for(size_t ch=0; ch!=curBand.ChannelCount(); ++ch)
+		
+	bool isConjugated = (wInLambda < 0.0 && !_isComplex);
+	if(isConjugated)
 	{
-		double
-			wavelength = curBand.ChannelWavelength(ch),
-			u = uInM / wavelength,
-			v = vInM / wavelength,
-			w = wInM / wavelength;
-		bool isConjugated = (w < 0.0 && !_isComplex);
-		if(isConjugated)
+		uInLambda = -uInLambda;
+		vInLambda = -vInLambda;
+		wInLambda = -wInLambda;
+	}
+	size_t
+		wLayer = WToLayer(wInLambda);
+	if(wLayer >= layerOffset && wLayer < layerRangeEnd)
+	{
+		size_t layerIndex = wLayer - layerOffset;
+		std::complex<double>* uvData = _layeredUVData[layerIndex];
+		std::complex<double> sample;
+		if(_gridMode == KaiserBessel)
 		{
-			u = -u;
-			v = -v;
-			w = -w;
-		}
-		size_t
-			wLayer = WToLayer(w);
-		if(wLayer >= layerOffset && wLayer < layerRangeEnd)
-		{
-			size_t layerIndex = wLayer - layerOffset;
-			std::complex<double>* uvData = _layeredUVData[layerIndex];
-			std::complex<double> sample;
-			if(_gridMode == KaiserBessel)
+			sample = 0.0;
+			double
+				xExact = uInLambda * _pixelSizeX * _width,
+				yExact = vInLambda * _pixelSizeY * _height;
+			int
+				x = round(xExact),
+				y = round(yExact),
+				xKernel = round((xExact - double(x)) * _overSamplingFactor),
+				yKernel = round((yExact - double(y)) * _overSamplingFactor);
+			xKernel = (xKernel + (_overSamplingFactor*3)/2) % _overSamplingFactor;
+			yKernel = (yKernel + (_overSamplingFactor*3)/2) % _overSamplingFactor;
+			std::vector<double> &kernel = _griddingKernels[xKernel + yKernel*_overSamplingFactor];
+			int mid = _kernelSize / 2;
+			if(x > -int(_width)/2 && y > -int(_height)/2 && x <= int(_width)/2 && y <= int(_height)/2)
 			{
-				sample = 0.0;
-				double
-					xExact = u * _pixelSizeX * _width,
-					yExact = v * _pixelSizeY * _height;
-				int
-					x = round(xExact),
-					y = round(yExact),
-					xKernel = round((xExact - double(x)) * _overSamplingFactor),
-					yKernel = round((yExact - double(y)) * _overSamplingFactor);
-				xKernel = (xKernel + (_overSamplingFactor*3)/2) % _overSamplingFactor;
-				yKernel = (yKernel + (_overSamplingFactor*3)/2) % _overSamplingFactor;
-				std::vector<double> &kernel = _griddingKernels[xKernel + yKernel*_overSamplingFactor];
-				int mid = _kernelSize / 2;
-				if(x > -int(_width)/2 && y > -int(_height)/2 && x <= int(_width)/2 && y <= int(_height)/2)
+				if(x < 0) x += _width;
+				if(y < 0) y += _height;
+				// Are we on the edge?
+				if(x < mid || x+mid+1 >= int(_width) || y < mid || y+mid+1 >= int(_height))
 				{
-					if(x < 0) x += _width;
-					if(y < 0) y += _height;
-					// Are we on the edge?
-					if(x < mid || x+mid+1 >= int(_width) || y < mid || y+mid+1 >= int(_height))
+					std::vector<double>::iterator kernelIter = kernel.begin();
+					for(size_t j=0; j!=_kernelSize; ++j)
 					{
-						std::vector<double>::iterator kernelIter = kernel.begin();
-						for(size_t j=0; j!=_kernelSize; ++j)
+						size_t cy = ((y+j+_height-mid) % _height) * _width;
+						for(size_t i=0; i!=_kernelSize; ++i)
 						{
-							size_t cy = ((y+j+_height-mid) % _height) * _width;
-							for(size_t i=0; i!=_kernelSize; ++i)
-							{
-								size_t cx = (x+i+_width-mid) % _width;
-								std::complex<double> *uvRowPtr = &uvData[cx + cy];
-								sample += std::complex<double>(uvRowPtr->real() * (*kernelIter), uvRowPtr->imag() * (*kernelIter));
-								++kernelIter;
-							}
+							size_t cx = (x+i+_width-mid) % _width;
+							std::complex<double> *uvRowPtr = &uvData[cx + cy];
+							sample += std::complex<double>(uvRowPtr->real() * (*kernelIter), uvRowPtr->imag() * (*kernelIter));
+							++kernelIter;
 						}
 					}
-					else {
-						x -= mid;
-						y -= mid;
-						std::vector<double>::iterator kernelIter = kernel.begin();
-						for(size_t j=0; j!=_kernelSize; ++j)
+				}
+				else {
+					x -= mid;
+					y -= mid;
+					std::vector<double>::iterator kernelIter = kernel.begin();
+					for(size_t j=0; j!=_kernelSize; ++j)
+					{
+						std::complex<double> *uvRowPtr = &uvData[x + y*_width];
+						for(size_t i=0; i!=_kernelSize; ++i)
 						{
-							std::complex<double> *uvRowPtr = &uvData[x + y*_width];
-							for(size_t i=0; i!=_kernelSize; ++i)
-							{
-								sample += std::complex<double>(uvRowPtr->real() * (*kernelIter), uvRowPtr->imag() * (*kernelIter));
-								++uvRowPtr;
-								++kernelIter;
-							}
-							++y;
+							sample += std::complex<double>(uvRowPtr->real() * (*kernelIter), uvRowPtr->imag() * (*kernelIter));
+							++uvRowPtr;
+							++kernelIter;
 						}
+						++y;
 					}
 				}
 			}
 			else {
-				int
-					x = int(round(u * _pixelSizeX * _width)),
-					y = int(round(v * _pixelSizeY * _height));
-				if(x > -int(_width)/2 && y > -int(_height)/2 && x <= int(_width)/2 && y <= int(_height)/2)
-				{
-					if(x < 0) x += _width;
-					if(y < 0) y += _height;
-					sample = uvData[x + y*_width];
-				} else {
-					//std::cout << "Sampling outside uv-plane (" << x << "," << y << ")\n";
-				}
+				sample = std::complex<double>(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
+				//std::cout << "Sampling outside uv-plane (" << x << "," << y << ")\n";
 			}
-			if(isConjugated)
-				data[ch] = sample;
-			else
-				data[ch] = std::conj(sample);
-		} else {
-			data[ch] = std::complex<double>(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
 		}
+		else {
+			int
+				x = int(round(uInLambda * _pixelSizeX * _width)),
+				y = int(round(vInLambda * _pixelSizeY * _height));
+			if(x > -int(_width)/2 && y > -int(_height)/2 && x <= int(_width)/2 && y <= int(_height)/2)
+			{
+				if(x < 0) x += _width;
+				if(y < 0) y += _height;
+				sample = uvData[x + y*_width];
+			} else {
+				sample = std::complex<double>(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
+				//std::cout << "Sampling outside uv-plane (" << x << "," << y << ")\n";
+			}
+		}
+		if(isConjugated)
+			value = sample;
+		else
+			value = std::conj(sample);
+	} else {
+		value = std::complex<double>(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
 	}
 }
 
-void LayeredImager::FinalizeImage(double multiplicationFactor, bool correctFFTFactor)
+void WStackingGridder::FinalizeImage(double multiplicationFactor, bool correctFFTFactor)
 {
 	freeLayeredUVData();
 	if(correctFFTFactor)
@@ -517,7 +499,7 @@ void LayeredImager::FinalizeImage(double multiplicationFactor, bool correctFFTFa
 		finalizeImage(multiplicationFactor, _imageDataImaginary);
 }
 
-void LayeredImager::finalizeImage(double multiplicationFactor, std::vector<double*>& dataArray)
+void WStackingGridder::finalizeImage(double multiplicationFactor, std::vector<double*>& dataArray)
 {
 	for(size_t i=1;i!=_nFFTThreads;++i)
 	{
@@ -546,7 +528,7 @@ void LayeredImager::finalizeImage(double multiplicationFactor, std::vector<doubl
 }
 
 template<bool Inverse>
-void LayeredImager::correctImageForKernel(double *image) const
+void WStackingGridder::correctImageForKernel(double *image) const
 {
 	const size_t n = _width * _overSamplingFactor;
 	double
@@ -578,14 +560,14 @@ void LayeredImager::correctImageForKernel(double *image) const
 	fftw_free(fftwOut);
 }
 
-void LayeredImager::GetGriddingCorrectionImage(double *image) const
+void WStackingGridder::GetGriddingCorrectionImage(double *image) const
 {
 	for(size_t i=0; i!=_width*_height; ++i)
 		image[i] = 1.0;
 	correctImageForKernel<true>(image);
 }
 
-void LayeredImager::initializePrediction(const double* image, double multiplicationFactor, std::vector<double*>& dataArray)
+void WStackingGridder::initializePrediction(const double* image, std::vector<double*>& dataArray)
 {
 	double *dataPtr = dataArray[0];
 	const double *inPtr = image;
@@ -596,7 +578,7 @@ void LayeredImager::initializePrediction(const double* image, double multiplicat
 		{
 			double l = ((_width/2)-(double) x) * _pixelSizeX + _phaseCentreDL;
 			if(std::isfinite(*dataPtr) && l*l + m*m < 1.0)
-				*dataPtr = *inPtr * multiplicationFactor;
+				*dataPtr = *inPtr;
 			else
 				*dataPtr = 0.0;
 			++dataPtr;
@@ -609,7 +591,7 @@ void LayeredImager::initializePrediction(const double* image, double multiplicat
 	}
 }
 
-void LayeredImager::initializeSqrtLMLookupTable()
+void WStackingGridder::initializeSqrtLMLookupTable()
 {
 	_sqrtLMLookupTable.resize(_width * _height);
 	std::vector<double>::iterator iter = _sqrtLMLookupTable.begin();
@@ -635,7 +617,7 @@ void LayeredImager::initializeSqrtLMLookupTable()
 }
 
 template<bool IsComplex>
-void LayeredImager::projectOnImageAndCorrect(const std::complex<double> *source, double w, size_t threadIndex)
+void WStackingGridder::projectOnImageAndCorrect(const std::complex<double> *source, double w, size_t threadIndex)
 {
 	double *dataReal = _imageData[threadIndex], *dataImaginary;
 	if(IsComplex)
@@ -675,7 +657,7 @@ void LayeredImager::projectOnImageAndCorrect(const std::complex<double> *source,
 	}
 }
 
-void LayeredImager::initializeSqrtLMLookupTableForSampling()
+void WStackingGridder::initializeSqrtLMLookupTableForSampling()
 {
 	_sqrtLMLookupTable.resize(_width * _height);
 	std::vector<double>::iterator iter = _sqrtLMLookupTable.begin();
@@ -703,7 +685,7 @@ void LayeredImager::initializeSqrtLMLookupTableForSampling()
 }
 
 template<bool IsComplex>
-void LayeredImager::copyImageToLayerAndInverseCorrect(std::complex<double> *dest, double w)
+void WStackingGridder::copyImageToLayerAndInverseCorrect(std::complex<double> *dest, double w)
 {
 	double *dataReal = _imageData[0], *dataImaginary;
 	if(IsComplex)
@@ -745,15 +727,46 @@ void LayeredImager::copyImageToLayerAndInverseCorrect(std::complex<double> *dest
 	}
 }
 
-void LayeredImager::ReplaceRealImageBuffer(double* newBuffer)
+void WStackingGridder::ReplaceRealImageBuffer(double* newBuffer)
 {
 	_imageBufferAllocator->Free(_imageData[0]);
 	_imageData[0] = newBuffer;
 }
 
-void LayeredImager::ReplaceImaginaryImageBuffer(double* newBuffer)
+void WStackingGridder::ReplaceImaginaryImageBuffer(double* newBuffer)
 {
 	_imageBufferAllocator->Free(_imageDataImaginary[0]);
 	_imageDataImaginary[0] = newBuffer;
 }
+
+#ifndef AVOID_CASACORE
+void WStackingGridder::AddData(const std::complex<float>* data, size_t dataDescId, double uInM, double vInM, double wInM)
+{
+	const BandData& curBand = _bandData[dataDescId];
+	for(size_t ch=0; ch!=curBand.ChannelCount(); ++ch)
+	{
+		double
+			wavelength = curBand.ChannelWavelength(ch),
+			u = uInM / wavelength,
+			v = vInM / wavelength,
+			w = wInM / wavelength;
+		AddDataSample(data[ch], u, v, w);
+	}
+}
+
+void WStackingGridder::SampleData(std::complex<float>* data, size_t dataDescId, double uInM, double vInM, double wInM)
+{
+	const BandData& curBand(_bandData[dataDescId]);
+	for(size_t ch=0; ch!=curBand.ChannelCount(); ++ch)
+	{
+		double
+			wavelength = curBand.ChannelWavelength(ch),
+			u = uInM / wavelength,
+			v = vInM / wavelength,
+			w = wInM / wavelength;
+		SampleDataSample(data[ch], u, v, w);
+	}
+}
+
+#endif
 

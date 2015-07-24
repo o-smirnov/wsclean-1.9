@@ -6,7 +6,10 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include <cstdio>
 #include <fstream>
@@ -55,8 +58,12 @@ PartitionedMS::PartitionedMS(const Handle& handle, size_t partIndex, Polarizatio
 		_modelFileMap = reinterpret_cast<char*>( mmap(NULL, length, PROT_WRITE | PROT_WRITE, MAP_SHARED, _fd, 0) );
 		if(_modelFileMap == MAP_FAILED)
 		{
+			int errsv = errno;
+			char msg[1024];
+			strerror_r(errsv, msg, 1024);
+			
 			_modelFileMap = 0;
-			throw std::runtime_error("Error creating memory map to temporary model file: mmap() return MAP_FAILED.");
+			throw std::runtime_error(std::string("Error creating memory map to temporary model file: mmap() returned MAP_FAILED with error message: ") + msg);
 		}
 	}
 	

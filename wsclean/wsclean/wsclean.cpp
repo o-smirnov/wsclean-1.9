@@ -1,7 +1,7 @@
 #include "wsclean.h"
 
 #include "inversionalgorithm.h"
-#include "wsinversion.h"
+#include "wsmsgridder.h"
 
 #include "../angle.h"
 #include "../areaset.h"
@@ -55,7 +55,7 @@ WSClean::WSClean() :
 	_forceReorder(false), _forceNoReorder(false),
 	_modelUpdateRequired(true),
 	_mfsWeighting(false),
-	_gridMode(LayeredImager::KaiserBessel),
+	_gridMode(WStackingGridder::KaiserBessel),
 	_filenames(),
 	_commandLine(),
 	_inversionWatch(false), _predictingWatch(false), _deconvolutionWatch(false),
@@ -525,7 +525,7 @@ void WSClean::initializeMFSImageWeights()
 
 void WSClean::prepareInversionAlgorithm(PolarizationEnum polarization)
 {
-	static_cast<WSInversion&>(*_inversionAlgorithm).SetGridMode(_gridMode);
+	static_cast<WSMSGridder&>(*_inversionAlgorithm).SetGridMode(_gridMode);
 	_inversionAlgorithm->SetImageWidth(_imgWidth);
 	_inversionAlgorithm->SetImageHeight(_imgHeight);
 	_inversionAlgorithm->SetPixelSizeX(_pixelScaleX);
@@ -574,28 +574,32 @@ void WSClean::performReordering(bool isPredictMode)
 		size_t nextIndex = 0;
 		for(size_t j=0; j!=_imagingTable.SquaredGroupCount(); ++j)
 		{
-			ImagingTableEntry& entry =
-				_imagingTable[_imagingTable.GetSquaredGroup(j).Front().index];
-			if(entry.polarization == *_polarizations.begin())
+			ImagingTable squaredGroup = _imagingTable.GetSquaredGroup(j);
+			for(size_t s=0; s!=squaredGroup.EntryCount(); ++s)
 			{
-				nextIndex = channels.size();
-				for(size_t b=0; b!=_msBands[i].BandCount(); ++b)
+				ImagingTableEntry& entry =
+					_imagingTable[squaredGroup[s].index];
+				if(entry.polarization == *_polarizations.begin())
 				{
-					MSSelection selection(_globalSelection);
-					if(selectChannels(selection, i, b, entry))
+					nextIndex = channels.size();
+					for(size_t b=0; b!=_msBands[i].BandCount(); ++b)
 					{
-						PartitionedMS::ChannelRange r;
-						r.band = b;
-						r.start = selection.ChannelRangeStart();
-						r.end = selection.ChannelRangeEnd();
-						entry.msData[i].bands[b].partIndex = nextIndex+b;
-						channels.push_back(r);
+						MSSelection selection(_globalSelection);
+						if(selectChannels(selection, i, b, entry))
+						{
+							PartitionedMS::ChannelRange r;
+							r.band = b;
+							r.start = selection.ChannelRangeStart();
+							r.end = selection.ChannelRangeEnd();
+							entry.msData[i].bands[b].partIndex = nextIndex+b;
+							channels.push_back(r);
+						}
 					}
 				}
-			}
-			else {
-				for(size_t b=0; b!=_msBands[i].BandCount(); ++b)
-					entry.msData[i].bands[b].partIndex = nextIndex+b;
+				else {
+					for(size_t b=0; b!=_msBands[i].BandCount(); ++b)
+						entry.msData[i].bands[b].partIndex = nextIndex+b;
+				}
 			}
 		}
 		_partitionedMSHandles.push_back(PartitionedMS::Partition(_filenames[i], channels, _globalSelection, _columnName, true, _deconvolution.MGain() != 1.0 || isPredictMode, _modelUpdateRequired, _polarizations, _temporaryDirectory));
@@ -729,7 +733,7 @@ bool WSClean::selectChannels(MSSelection& selection, size_t msIndex, size_t band
 
 void WSClean::runIndependentGroup(const ImagingTable& groupTable)
 {
-	_inversionAlgorithm.reset(new WSInversion(&_imageAllocator, _threadCount, _memFraction, _absMemLimit));
+	_inversionAlgorithm.reset(new WSMSGridder(&_imageAllocator, _threadCount, _memFraction, _absMemLimit));
 	
 	_modelImages.Initialize(_fitsWriter, _polarizations.size(), _channelsOut, _prefixName + "-model", _imageAllocator);
 	_residualImages.Initialize(_fitsWriter, _polarizations.size(), _channelsOut, _prefixName + "-residual", _imageAllocator);
@@ -841,7 +845,7 @@ void WSClean::runIndependentGroup(const ImagingTable& groupTable)
 				"(beam=" + Angle::ToNiceString(beamMin) + "-" +
 				Angle::ToNiceString(beamMaj) + ", PA=" +
 				Angle::ToNiceString(beamPA) + ")";
-			if(_deconvolution.MultiScale() || _deconvolution.UseMoreSane())
+			if(_deconvolution.MultiScale() || _deconvolution.UseMoreSane() || _deconvolution.UseIUWT())
 			{
 				std::cout << "Rendering sources to restored image " + beamStr + "... " << std::flush;
 				renderer.Restore(restoredImage, modelImage, _imgWidth, _imgHeight, beamMaj, beamMin, beamPA, Polarization::StokesI);
@@ -921,7 +925,7 @@ void WSClean::writeModelImages(const ImagingTable& groupTable)
 
 void WSClean::predictGroup(const ImagingTable& imagingGroup)
 {
-	_inversionAlgorithm.reset(new WSInversion(&_imageAllocator, _threadCount, _memFraction, _absMemLimit));
+	_inversionAlgorithm.reset(new WSMSGridder(&_imageAllocator, _threadCount, _memFraction, _absMemLimit));
 	
 	_modelImages.Initialize(_fitsWriter, _polarizations.size(), 1, _prefixName + "-model", _imageAllocator);
 	

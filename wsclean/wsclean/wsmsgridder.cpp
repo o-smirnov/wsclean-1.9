@@ -1,9 +1,10 @@
-#include "wsinversion.h"
+#include "wsmsgridder.h"
 
 #include "../imageweights.h"
 #include "../buffered_lane.h"
 #include "../fftresampler.h"
-#include "../imagebufferallocator.h"
+#include "imagebufferallocator.h"
+
 #include "../angle.h"
 
 #include "../msproviders/msprovider.h"
@@ -23,13 +24,13 @@
 
 #include <boost/thread/thread.hpp>
 
-WSInversion::MSData::MSData() : matchingRows(0), totalRowsProcessed(0)
+WSMSGridder::MSData::MSData() : matchingRows(0), totalRowsProcessed(0)
 { }
 
-WSInversion::MSData::~MSData()
+WSMSGridder::MSData::~MSData()
 { }
 
-WSInversion::WSInversion(ImageBufferAllocator<double>* imageAllocator, size_t threadCount, double memFraction, double absMemLimit) : InversionAlgorithm(), _phaseCentreRA(0.0), _phaseCentreDec(0.0), _phaseCentreDL(0.0), _phaseCentreDM(0.0), _denormalPhaseCentre(false), _hasFrequencies(false), _freqHigh(0.0), _freqLow(0.0), _bandStart(0.0), _bandEnd(0.0), _beamSize(0.0), _totalWeight(0.0), _startTime(0.0), _gridMode(LayeredImager::NearestNeighbour), _cpuCount(threadCount), _laneBufferSize(_cpuCount*2), _imageBufferAllocator(imageAllocator)
+WSMSGridder::WSMSGridder(ImageBufferAllocator<double>* imageAllocator, size_t threadCount, double memFraction, double absMemLimit) : InversionAlgorithm(), _phaseCentreRA(0.0), _phaseCentreDec(0.0), _phaseCentreDL(0.0), _phaseCentreDM(0.0), _denormalPhaseCentre(false), _hasFrequencies(false), _freqHigh(0.0), _freqLow(0.0), _bandStart(0.0), _bandEnd(0.0), _beamSize(0.0), _totalWeight(0.0), _startTime(0.0), _gridMode(WStackingGridder::NearestNeighbour), _cpuCount(threadCount), _laneBufferSize(_cpuCount*2), _imageBufferAllocator(imageAllocator)
 {
 	long int pageCount = sysconf(_SC_PHYS_PAGES), pageSize = sysconf(_SC_PAGE_SIZE);
 	_memSize = (int64_t) pageCount * (int64_t) pageSize;
@@ -53,7 +54,7 @@ WSInversion::WSInversion(ImageBufferAllocator<double>* imageAllocator, size_t th
 	}
 }
 		
-void WSInversion::initializeMeasurementSet(size_t msIndex, WSInversion::MSData& msData)
+void WSMSGridder::initializeMeasurementSet(size_t msIndex, WSMSGridder::MSData& msData)
 {
 	MSProvider& msProvider = MeasurementSet(msIndex);
 	msData.msProvider = &msProvider;
@@ -229,7 +230,7 @@ void WSInversion::initializeMeasurementSet(size_t msIndex, WSInversion::MSData& 
 		{
 			// When nwlayers is lower than the nr of cores, we cannot parallellize well. 
 			// However, we don't want extra w-layers if we are low on mem, as that might slow down the process
-			double memoryRequired = double(_cpuCount) * double(sizeof(LayeredImager::imgnum_t))*double(_actualInversionWidth*_actualInversionHeight);
+			double memoryRequired = double(_cpuCount) * double(sizeof(double))*double(_actualInversionWidth*_actualInversionHeight);
 			if(4.0 * memoryRequired < double(_memSize))
 			{
 				std::cout <<
@@ -251,7 +252,7 @@ void WSInversion::initializeMeasurementSet(size_t msIndex, WSInversion::MSData& 
 	}
 }
 
-void WSInversion::countSamplesPerLayer(MSData& msData)
+void WSMSGridder::countSamplesPerLayer(MSData& msData)
 {
 	std::vector<size_t> sampleCount(WGridSize());
 	msData.matchingRows = 0;
@@ -265,7 +266,7 @@ void WSInversion::countSamplesPerLayer(MSData& msData)
 		for(size_t ch=msData.startChannel; ch!=msData.endChannel; ++ch)
 		{
 			double w = wInM / bandData.ChannelWavelength(ch);
-			size_t wLayerIndex = _imager->WToLayer(w);
+			size_t wLayerIndex = _gridder->WToLayer(w);
 			if(wLayerIndex < WGridSize())
 				++sampleCount[wLayerIndex];
 		}
@@ -279,12 +280,14 @@ void WSInversion::countSamplesPerLayer(MSData& msData)
 	std::cout << '\n';
 }
 
-void WSInversion::gridMeasurementSet(MSData &msData)
+void WSMSGridder::gridMeasurementSet(MSData &msData)
 {
 	const MultiBandData selectedBand(msData.SelectedBand());
-	_imager->PrepareBand(selectedBand);
+	_gridder->PrepareBand(selectedBand);
 	std::vector<std::complex<float>> modelBuffer(selectedBand.MaxChannels());
 	std::vector<float> weightBuffer(selectedBand.MaxChannels());
+	
+	lane_write_buffer<InversionWorkItem> writeBuffer(&*_inversionWorkLane, 128);
 	
 	size_t rowsRead = 0;
 	msData.msProvider->Reset();
@@ -297,7 +300,7 @@ void WSInversion::gridMeasurementSet(MSData &msData)
 		const double
 			w1 = wInMeters / curBand.LongestWavelength(),
 			w2 = wInMeters / curBand.SmallestWavelength();
-		if(_imager->IsInLayerRange(w1, w2))
+		if(_gridder->IsInLayerRange(w1, w2))
 		{
 			InversionWorkItem newItem;
 			newItem.u = uInMeters;
@@ -384,7 +387,7 @@ void WSInversion::gridMeasurementSet(MSData &msData)
 				} break;
 			}
 			
-			_inversionWorkLane->write(newItem);
+			writeBuffer.write(newItem);
 			
 			++rowsRead;
 		}
@@ -395,7 +398,7 @@ void WSInversion::gridMeasurementSet(MSData &msData)
 	msData.totalRowsProcessed += rowsRead;
 }
 
-void WSInversion::workThreadParallel(const MultiBandData* selectedBand)
+void WSMSGridder::workThreadParallel(const MultiBandData* selectedBand)
 {
 	std::unique_ptr<ao::lane<InversionWorkSample>[]> lanes(new ao::lane<InversionWorkSample>[_cpuCount]);
 	boost::thread_group group;
@@ -412,11 +415,13 @@ void WSInversion::workThreadParallel(const MultiBandData* selectedBand)
 		lanes[i].resize(selectedBand->FirstBand().ChannelCount() * _laneBufferSize);
 		bufferedLanes[i].reset(&lanes[i], bufferedLaneSize);
 		
-		group.add_thread(new boost::thread(&WSInversion::workThreadPerSample, this, &lanes[i]));
+		group.add_thread(new boost::thread(&WSMSGridder::workThreadPerSample, this, &lanes[i]));
 	}
 	
+	lane_read_buffer<InversionWorkItem> readBuffer(&*_inversionWorkLane, 32);
+	
 	InversionWorkItem workItem;
-	while(_inversionWorkLane->read(workItem))
+	while(readBuffer.read(workItem))
 	{
 		const BandData& curBand = (*selectedBand)[workItem.dataDescId];
 		InversionWorkSample sampleData;
@@ -427,7 +432,7 @@ void WSInversion::workThreadParallel(const MultiBandData* selectedBand)
 			sampleData.uInLambda = workItem.u / wavelength;
 			sampleData.vInLambda = workItem.v / wavelength;
 			sampleData.wInLambda = workItem.w / wavelength;
-			size_t cpu = _imager->WToLayer(sampleData.wInLambda) % _cpuCount;
+			size_t cpu = _gridder->WToLayer(sampleData.wInLambda) % _cpuCount;
 			//std::cout << cpu << ' ' << lanes[cpu].size() << '\n';
 			bufferedLanes[cpu].write(sampleData);
 		}
@@ -438,30 +443,30 @@ void WSInversion::workThreadParallel(const MultiBandData* selectedBand)
 	group.join_all();
 }
 
-void WSInversion::workThreadPerSample(ao::lane<InversionWorkSample>* workLane)
+void WSMSGridder::workThreadPerSample(ao::lane<InversionWorkSample>* workLane)
 {
 	lane_read_buffer<InversionWorkSample> buffer(workLane, std::min(_laneBufferSize*16, workLane->capacity()));
 	InversionWorkSample sampleData;
 	while(buffer.read(sampleData))
 	{
-		_imager->AddDataSample(sampleData.sample, sampleData.uInLambda, sampleData.vInLambda, sampleData.wInLambda);
+		_gridder->AddDataSample(sampleData.sample, sampleData.uInLambda, sampleData.vInLambda, sampleData.wInLambda);
 	}
 }
 
-void WSInversion::predictMeasurementSet(MSData &msData)
+void WSMSGridder::predictMeasurementSet(MSData &msData)
 {
 	msData.msProvider->ReopenRW();
 	const MultiBandData selectedBandData(msData.SelectedBand());
-	_imager->PrepareBand(selectedBandData);
+	_gridder->PrepareBand(selectedBandData);
 	
 	size_t rowsProcessed = 0;
 	
 	ao::lane<PredictionWorkItem> calcLane(_laneBufferSize+_cpuCount), writeLane(_laneBufferSize);
 	lane_write_buffer<PredictionWorkItem> bufferedCalcLane(&calcLane, _laneBufferSize);
-	boost::thread writeThread(&WSInversion::predictWriteThread, this, &writeLane, &msData);
+	boost::thread writeThread(&WSMSGridder::predictWriteThread, this, &writeLane, &msData);
 	boost::thread_group calcThreads;
 	for(size_t i=0; i!=_cpuCount; ++i)
-		calcThreads.add_thread(new boost::thread(&WSInversion::predictCalcThread, this, &calcLane, &writeLane));
+		calcThreads.add_thread(new boost::thread(&WSMSGridder::predictCalcThread, this, &calcLane, &writeLane));
 
 		
 	/* Start by reading the u,v,ws in, so we don't need IO access
@@ -478,7 +483,7 @@ void WSInversion::predictMeasurementSet(MSData &msData)
 		const double
 			w1 = wInMeters / curBand.LongestWavelength(),
 			w2 = wInMeters / curBand.SmallestWavelength();
-		if(_imager->IsInLayerRange(w1, w2))
+		if(_gridder->IsInLayerRange(w1, w2))
 		{
 			us.push_back(uInMeters);
 			vs.push_back(vInMeters);
@@ -501,7 +506,8 @@ void WSInversion::predictMeasurementSet(MSData &msData)
 				
 		bufferedCalcLane.write(newItem);
 	}
-	std::cout << "Rows that were required: " << rowsProcessed << '/' << msData.matchingRows << '\n';
+	if(Verbose())
+		std::cout << "Rows that were required: " << rowsProcessed << '/' << msData.matchingRows << '\n';
 	msData.totalRowsProcessed += rowsProcessed;
 	
 	bufferedCalcLane.write_end();
@@ -510,20 +516,20 @@ void WSInversion::predictMeasurementSet(MSData &msData)
 	writeThread.join();
 }
 
-void WSInversion::predictCalcThread(ao::lane<PredictionWorkItem>* inputLane, ao::lane<PredictionWorkItem>* outputLane)
+void WSMSGridder::predictCalcThread(ao::lane<PredictionWorkItem>* inputLane, ao::lane<PredictionWorkItem>* outputLane)
 {
 	lane_write_buffer<PredictionWorkItem> writeBuffer(outputLane, _laneBufferSize);
 	
 	PredictionWorkItem item;
 	while(inputLane->read(item))
 	{
-		_imager->SampleData(item.data, item.dataDescId, item.u, item.v, item.w);
+		_gridder->SampleData(item.data, item.dataDescId, item.u, item.v, item.w);
 		
 		writeBuffer.write(item);
 	}
 }
 
-void WSInversion::predictWriteThread(ao::lane<PredictionWorkItem>* predictionWorkLane, const MSData* msData)
+void WSMSGridder::predictWriteThread(ao::lane<PredictionWorkItem>* predictionWorkLane, const MSData* msData)
 {
 	lane_read_buffer<PredictionWorkItem> buffer(predictionWorkLane, std::min(_laneBufferSize, predictionWorkLane->capacity()));
 	PredictionWorkItem workItem;
@@ -534,7 +540,7 @@ void WSInversion::predictWriteThread(ao::lane<PredictionWorkItem>* predictionWor
 	}
 }
 
-void WSInversion::Invert()
+void WSMSGridder::Invert()
 {
 	MSData* msDataVector = new MSData[MeasurementSetCount()];
 	_hasFrequencies = false;
@@ -549,13 +555,13 @@ void WSInversion::Invert()
 		if(msDataVector[i].maxW > maxW) maxW = msDataVector[i].maxW;
 	}
 	
-	_imager = std::unique_ptr<LayeredImager>(new LayeredImager(_actualInversionWidth, _actualInversionHeight, _actualPixelSizeX, _actualPixelSizeY, _cpuCount, _imageBufferAllocator, AntialiasingKernelSize(), OverSamplingFactor()));
-	_imager->SetGridMode(_gridMode);
+	_gridder = std::unique_ptr<WStackingGridder>(new WStackingGridder(_actualInversionWidth, _actualInversionHeight, _actualPixelSizeX, _actualPixelSizeY, _cpuCount, _imageBufferAllocator, AntialiasingKernelSize(), OverSamplingFactor()));
+	_gridder->SetGridMode(_gridMode);
 	if(_denormalPhaseCentre)
-		_imager->SetDenormalPhaseCentre(_phaseCentreDL, _phaseCentreDM);
-	_imager->SetIsComplex(IsComplex());
+		_gridder->SetDenormalPhaseCentre(_phaseCentreDL, _phaseCentreDM);
+	_gridder->SetIsComplex(IsComplex());
 	//_imager->SetImageConjugatePart(Polarization() == Polarization::YX && IsComplex());
-	_imager->PrepareWLayers(WGridSize(), double(_memSize)*(7.0/10.0), minW, maxW);
+	_gridder->PrepareWLayers(WGridSize(), double(_memSize)*(7.0/10.0), minW, maxW);
 	
 	if(Verbose())
 	{
@@ -564,14 +570,14 @@ void WSInversion::Invert()
 	}
 	
 	_totalWeight = 0.0;
-	for(size_t pass=0; pass!=_imager->NPasses(); ++pass)
+	for(size_t pass=0; pass!=_gridder->NPasses(); ++pass)
 	{
 		std::cout << "Gridding pass " << pass << "... ";
 		if(Verbose()) std::cout << '\n';
 		else std::cout << std::flush;
-		_inversionWorkLane.reset(new ao::lane<InversionWorkItem>(16));
+		_inversionWorkLane.reset(new ao::lane<InversionWorkItem>(2048));
 		
-		_imager->StartInversionPass(pass);
+		_gridder->StartInversionPass(pass);
 		
 		for(size_t i=0; i!=MeasurementSetCount(); ++i)
 		{
@@ -581,7 +587,7 @@ void WSInversion::Invert()
 			
 			const MultiBandData selectedBand(msData.SelectedBand());
 			
-			boost::thread thread(&WSInversion::workThreadParallel, this, &selectedBand);
+			boost::thread thread(&WSMSGridder::workThreadParallel, this, &selectedBand);
 		
 			gridMeasurementSet(msData);
 			
@@ -591,7 +597,7 @@ void WSInversion::Invert()
 		_inversionWorkLane.reset();
 		
 		std::cout << "Fourier transforms...\n";
-		_imager->FinishInversionPass();
+		_gridder->FinishInversionPass();
 	}
 	
 	if(Verbose())
@@ -610,10 +616,10 @@ void WSInversion::Invert()
 	}
 	
 	if(NormalizeForWeighting())
-		_imager->FinalizeImage(1.0/_totalWeight, false);
+		_gridder->FinalizeImage(1.0/_totalWeight, false);
 	else {
 		std::cout << "Not dividing by normalization factor of " << _totalWeight << ".\n";
-		_imager->FinalizeImage(1.0, true);
+		_gridder->FinalizeImage(1.0, true);
 	}
 	
 	if(ImageWidth()!=_actualInversionWidth || ImageHeight()!=_actualInversionHeight)
@@ -625,23 +631,23 @@ void WSInversion::Invert()
 			double *resizedReal = _imageBufferAllocator->Allocate(ImageWidth() * ImageHeight());
 			double *resizedImag = _imageBufferAllocator->Allocate(ImageWidth() * ImageHeight());
 			resampler.Start();
-			resampler.AddTask(_imager->RealImage(), resizedReal);
-			resampler.AddTask(_imager->ImaginaryImage(), resizedImag);
+			resampler.AddTask(_gridder->RealImage(), resizedReal);
+			resampler.AddTask(_gridder->ImaginaryImage(), resizedImag);
 			resampler.Finish();
-			_imager->ReplaceRealImageBuffer(resizedReal);
-			_imager->ReplaceImaginaryImageBuffer(resizedImag);
+			_gridder->ReplaceRealImageBuffer(resizedReal);
+			_gridder->ReplaceImaginaryImageBuffer(resizedImag);
 		}
 		else {
 			double *resized = _imageBufferAllocator->Allocate(ImageWidth() * ImageHeight());
-			resampler.RunSingle(_imager->RealImage(), resized);
-			_imager->ReplaceRealImageBuffer(resized);
+			resampler.RunSingle(_gridder->RealImage(), resized);
+			_gridder->ReplaceRealImageBuffer(resized);
 		}
 	}
 	
 	delete[] msDataVector;
 }
 
-void WSInversion::Predict(double* real, double* imaginary)
+void WSMSGridder::Predict(double* real, double* imaginary)
 {
 	if(imaginary==0 && IsComplex())
 		throw std::runtime_error("Missing imaginary in complex prediction");
@@ -661,13 +667,13 @@ void WSInversion::Predict(double* real, double* imaginary)
 		if(msDataVector[i].maxW > maxW) maxW = msDataVector[i].maxW;
 	}
 	
-	_imager = std::unique_ptr<LayeredImager>(new LayeredImager(_actualInversionWidth, _actualInversionHeight, _actualPixelSizeX, _actualPixelSizeY, _cpuCount, _imageBufferAllocator, AntialiasingKernelSize(), OverSamplingFactor()));
-	_imager->SetGridMode(_gridMode);
+	_gridder = std::unique_ptr<WStackingGridder>(new WStackingGridder(_actualInversionWidth, _actualInversionHeight, _actualPixelSizeX, _actualPixelSizeY, _cpuCount, _imageBufferAllocator, AntialiasingKernelSize(), OverSamplingFactor()));
+	_gridder->SetGridMode(_gridMode);
 	if(_denormalPhaseCentre)
-		_imager->SetDenormalPhaseCentre(_phaseCentreDL, _phaseCentreDM);
-	_imager->SetIsComplex(IsComplex());
+		_gridder->SetDenormalPhaseCentre(_phaseCentreDL, _phaseCentreDM);
+	_gridder->SetIsComplex(IsComplex());
 	//_imager->SetImageConjugatePart(Polarization() == Polarization::YX && IsComplex());
-	_imager->PrepareWLayers(WGridSize(), double(_memSize)*(7.0/10.0), minW, maxW);
+	_gridder->PrepareWLayers(WGridSize(), double(_memSize)*(7.0/10.0), minW, maxW);
 	
 	if(Verbose())
 	{
@@ -698,19 +704,19 @@ void WSInversion::Predict(double* real, double* imaginary)
 		}
 	}
 	
-	for(size_t pass=0; pass!=_imager->NPasses(); ++pass)
+	for(size_t pass=0; pass!=_gridder->NPasses(); ++pass)
 	{
-		std::cout << "Fourier transforms... ";
+		std::cout << "Fourier transforms for pass " << pass << "... ";
 		if(Verbose()) std::cout << '\n';
 		else std::cout << std::flush;
 		if(imaginary == 0)
-			_imager->InitializePrediction(real, 1.0);
+			_gridder->InitializePrediction(real);
 		else
-			_imager->InitializePrediction(real, imaginary, 1.0);
+			_gridder->InitializePrediction(real, imaginary);
 		
-		std::cout << "Prediction pass " << pass << "...\n";
-		_imager->StartPredictionPass(pass);
+		_gridder->StartPredictionPass(pass);
 		
+		std::cout << "Predicting...\n";
 		for(size_t i=0; i!=MeasurementSetCount(); ++i)
 			predictMeasurementSet(msDataVector[i]);
 	}
@@ -735,7 +741,7 @@ void WSInversion::Predict(double* real, double* imaginary)
 	delete[] msDataVector;
 }
 
-void WSInversion::rotateVisibilities(const BandData &bandData, double shiftFactor, std::complex<float>* dataIter)
+void WSMSGridder::rotateVisibilities(const BandData &bandData, double shiftFactor, std::complex<float>* dataIter)
 {
 	for(unsigned ch=0; ch!=bandData.ChannelCount(); ++ch)
 	{

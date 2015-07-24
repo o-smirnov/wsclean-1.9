@@ -1,8 +1,8 @@
 #ifndef CLEANABLE_IMAGE_SET_H
 #define CLEANABLE_IMAGE_SET_H
 
-#include "../cachedimageset.h"
-#include "../imagebufferallocator.h"
+#include "../wsclean/cachedimageset.h"
+#include "../wsclean/imagebufferallocator.h"
 
 #include <vector>
 

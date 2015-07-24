@@ -5,6 +5,7 @@
 #include "simpleclean.h"
 #include "moresane.h"
 #include "multiscaleclean.h"
+#include "iuwtdeconvolution.h"
 
 #include "../casamaskreader.h"
 #include "../wsclean/imagingtable.h"
@@ -19,6 +20,7 @@ Deconvolution::Deconvolution() :
 	_cleanBorderRatio(0.05),
 	_fitsMask(), _casaMask(),
 	_useMoreSane(false),
+	_useIUWT(false),
 	_moreSaneLocation(), _moreSaneArgs()
 {
 }
@@ -32,7 +34,9 @@ void Deconvolution::Perform(const class ImagingTable& groupTable, bool& reachedM
 {
 	std::cout << std::flush << " == Cleaning (" << majorIterationNr << ") ==\n";
 	
-	if(_summedCount != 1)
+	if(_useIUWT)
+		performDynamicClean(groupTable, reachedMajorThreshold, majorIterationNr);
+	else if(_summedCount != 1)
 	{
 		if(_squaredCount == 4)
 			performJoinedPolFreqClean<4>(reachedMajorThreshold, majorIterationNr);
@@ -50,6 +54,77 @@ void Deconvolution::Perform(const class ImagingTable& groupTable, bool& reachedM
 	}
 	else {
 		performSimpleClean(groupTable[0].outputChannelIndex, reachedMajorThreshold, majorIterationNr, groupTable[0].polarization);
+	}
+}
+
+void Deconvolution::performDynamicClean(const class ImagingTable& groupTable, bool& reachedMajorThreshold, size_t majorIterationNr)
+{
+	_imageAllocator->FreeUnused();
+	DynamicSet
+		residualSet(&groupTable, _imgWidth, _imgHeight),
+		modelSet(&groupTable, _imgWidth, _imgHeight);
+	size_t imgIndex = 0;
+	for(size_t i=0; i!=groupTable.EntryCount(); ++i)
+	{
+		const ImagingTableEntry& e = groupTable[i];
+		if(e.imageCount >= 1)
+		{
+			_residualImages->Load(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
+			_modelImages->Load(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
+			++imgIndex;
+		}
+		if(e.imageCount == 2)
+		{
+			_residualImages->Load(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
+			_modelImages->Load(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
+			++imgIndex;
+		}
+	}
+	imgIndex = 0;
+	std::vector<ao::uvector<double>> psfVecs(groupTable.SquaredGroupCount());
+	for(size_t i=0; i!=groupTable.SquaredGroupCount(); ++i)
+	{
+		ImagingTable subTable = groupTable.GetSquaredGroup(i);
+		const ImagingTableEntry& e = subTable.Front();
+		if(e.imageCount >= 1)
+		{
+			psfVecs[imgIndex].resize(_imgWidth * _imgHeight);
+			_psfImages->Load(psfVecs[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
+			++imgIndex;
+		}
+		if(e.imageCount == 2)
+		{
+			psfVecs[imgIndex].resize(_imgWidth * _imgHeight);
+			_psfImages->Load(psfVecs[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
+			++imgIndex;
+		}
+	}
+	
+	ao::uvector<const double*> psfs(groupTable.SquaredGroupCount());
+	for(size_t i=0; i!=psfVecs.size(); ++i)
+		psfs[i] = psfVecs[i].data();
+	
+	UntypedDeconvolutionAlgorithm& algorithm =
+		static_cast<UntypedDeconvolutionAlgorithm&>(*_cleanAlgorithm);
+		
+	algorithm.ExecuteMajorIteration(residualSet, modelSet, psfs, _imgWidth, _imgHeight, reachedMajorThreshold);
+	
+	imgIndex = 0;
+	for(size_t i=0; i!=groupTable.EntryCount(); ++i)
+	{
+		const ImagingTableEntry& e = groupTable[i];
+		if(e.imageCount >= 1)
+		{
+			_residualImages->Store(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
+			_modelImages->Store(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
+			++imgIndex;
+		}
+		if(e.imageCount == 2)
+		{
+			_residualImages->Store(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
+			_modelImages->Store(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
+			++imgIndex;
+		}
 	}
 }
 
@@ -154,6 +229,10 @@ void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTa
 	if(_useMoreSane)
 	{
 		_cleanAlgorithm.reset(new MoreSane(_moreSaneLocation, _moreSaneArgs));
+	}
+	else if(_useIUWT)
+	{
+		_cleanAlgorithm.reset(new IUWTDeconvolution());
 	}
 	else if(_squaredCount != 1)
 	{

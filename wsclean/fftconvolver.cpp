@@ -111,20 +111,21 @@ void FFTConvolver::PrepareKernel(double* dest, const double* source, size_t imgW
 void FFTConvolver::ConvolveSameSize(double* image, const double* kernel, size_t imgWidth, size_t imgHeight)
 {
 	const size_t imgSize = imgWidth * imgHeight;
+	const size_t complexSize = (imgWidth/2+1) * imgHeight;
 	double* tempData = reinterpret_cast<double*>(fftw_malloc(imgSize * sizeof(double)));
-	fftw_complex* fftImageData = reinterpret_cast<fftw_complex*>(fftw_malloc(imgSize * sizeof(fftw_complex)));
-	fftw_complex* fftKernelData = reinterpret_cast<fftw_complex*>(fftw_malloc(imgSize * sizeof(fftw_complex)));
+	fftw_complex* fftImageData = reinterpret_cast<fftw_complex*>(fftw_malloc(complexSize * sizeof(fftw_complex)));
+	fftw_complex* fftKernelData = reinterpret_cast<fftw_complex*>(fftw_malloc(complexSize * sizeof(fftw_complex)));
 	fftw_plan inToFPlan = fftw_plan_dft_r2c_2d(imgHeight, imgWidth, tempData, fftImageData, FFTW_ESTIMATE);
 	fftw_plan fToOutPlan = fftw_plan_dft_c2r_2d(imgHeight, imgWidth, fftImageData, tempData, FFTW_ESTIMATE);
 	
 	memcpy(tempData, image, imgSize * sizeof(double));
-	fftw_execute_dft_r2c(inToFPlan, tempData, reinterpret_cast<fftw_complex*>(fftImageData));
+	fftw_execute_dft_r2c(inToFPlan, tempData, fftImageData);
 	
 	memcpy(tempData, kernel, imgSize * sizeof(double));
-	fftw_execute_dft_r2c(inToFPlan, tempData, reinterpret_cast<fftw_complex*>(fftKernelData));
+	fftw_execute_dft_r2c(inToFPlan, tempData, fftKernelData);
 	
 	double fact = 1.0/imgSize;
-	for(size_t i=0; i!=imgSize; ++i)
+	for(size_t i=0; i!=complexSize; ++i)
 		reinterpret_cast<std::complex<double>*>(fftImageData)[i] *= fact * reinterpret_cast<std::complex<double>*>(fftKernelData)[i];
 		
 	fftw_execute_dft_c2r(fToOutPlan, reinterpret_cast<fftw_complex*>(fftImageData), tempData);

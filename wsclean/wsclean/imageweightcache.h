@@ -6,6 +6,8 @@
 #include "../imageweights.h"
 #include "../weightmode.h"
 
+#include <limits>
+
 class ImageWeightCache
 {
 public:
@@ -18,7 +20,9 @@ public:
 		_minUVInLambda(minUVInLambda),
 		_maxUVInLambda(maxUVInLambda),
 		_rankFilterLevel(rankFilterLevel),
-		_rankFilterSize(rankFilterSize)
+		_rankFilterSize(rankFilterSize),
+		_currentWeightChannel(std::numeric_limits<size_t>::max()),
+		_currentWeightInterval(std::numeric_limits<size_t>::max())
 	{
 	}
 	

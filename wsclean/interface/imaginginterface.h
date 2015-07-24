@@ -2,13 +2,18 @@
 #define IMAGING_INTERFACE_H
 
 #ifndef DCOMPLEX
+
 #ifdef __cplusplus
 #include <complex>
 #define DCOMPLEX std::complex<double>
-extern "C" {
 #else
 #define DCOMPLEX double complex
 #endif
+	
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 	
 typedef struct
@@ -34,5 +39,9 @@ typedef struct
 	void (*operator_A_function)(void* userData, void* dataOut, void* dataIn);
 	void (*operator_At_function)(void* userData, void* dataOut, void* dataIn);
 } imaging_data;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "../polarizationenum.h"
+#include "../uvector.h"
 
 namespace ao {
 	template<typename T> class lane;
@@ -93,6 +94,16 @@ public:
 	virtual ~TypedDeconvolutionAlgorithm() { }
 	
 	virtual void ExecuteMajorIteration(ImageSetType& dataImage, ImageSetType& modelImage, std::vector<double*> psfImages, size_t width, size_t height, bool& reachedStopGain) = 0;
+	
+private:
+};
+
+class UntypedDeconvolutionAlgorithm : public DeconvolutionAlgorithm
+{
+public:
+	virtual ~UntypedDeconvolutionAlgorithm() { }
+	
+	virtual void ExecuteMajorIteration(class DynamicSet& dataImage, class DynamicSet& modelImage, const ao::uvector<const double*>& psfImages, size_t width, size_t height, bool& reachedMajorThreshold) = 0;
 	
 private:
 };

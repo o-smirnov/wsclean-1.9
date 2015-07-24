@@ -2,7 +2,7 @@
 #define DECONVOLUTION_H
 
 #include "../uvector.h"
-#include "../imagebufferallocator.h"
+#include "../wsclean/imagebufferallocator.h"
 
 #include <cstring>
 
@@ -46,6 +46,7 @@ public:
 	void SetMultiscaleScaleBias(double scaleBias)
 	{ _multiscaleScaleBias = scaleBias; }
 	void SetUseMoreSane(bool useMoreSane) { _useMoreSane = useMoreSane; }
+	void SetUseIUWT(bool useIUWT) { _useIUWT = useIUWT; }
 	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
 	void SetMoreSaneArgs(const std::string& arguments) { _moreSaneArgs = arguments; }
 	
@@ -67,8 +68,11 @@ public:
 	
 	bool MultiScale() const { return _multiscale; }
 	bool UseMoreSane() const { return _useMoreSane; }
+	bool UseIUWT() const { return _useIUWT; }
 	bool IsInitialized() const { return _cleanAlgorithm != 0; }
 private:
+	void performDynamicClean(const class ImagingTable& groupTable, bool& reachedMajorThreshold, size_t majorIterationNr);
+	
 	void performSimpleClean(size_t currentChannelIndex, bool& reachedMajorThreshold, size_t majorIterationNr, PolarizationEnum polarization);
 	
 	template<size_t PolCount>
@@ -84,7 +88,7 @@ private:
 	double _multiscaleThresholdBias, _multiscaleScaleBias;
 	double _cleanBorderRatio;
 	std::string _fitsMask, _casaMask;
-	bool _useMoreSane;
+	bool _useMoreSane, _useIUWT;
 	std::string _moreSaneLocation, _moreSaneArgs;
 	
 	std::unique_ptr<class DeconvolutionAlgorithm> _cleanAlgorithm;

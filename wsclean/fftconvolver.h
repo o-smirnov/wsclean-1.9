@@ -4,6 +4,7 @@
 #include <cstring>
 
 class FFTConvolver {
+	
 public:
 	/**
 	 * Convolve an image with a smaller kernel. No preparation of either image is needed.
@@ -12,12 +13,14 @@ public:
 	 * the case of even image sizes, the middle falls between two pixels.
 	 */
 	static void Convolve(double* image, size_t imgWidth, size_t imgHeight, const double* kernel, size_t kernelSize);
+	
 	/**
 	 * Convolve an image with a smaller kernel. No preparation of either image is needed.
 	 * 
 	 * This function assumes that n/2 is the middle pixel, and reverses the kernel.
 	 */
 	static void ReverseAndConvolve(double* image, size_t imgWidth, size_t imgHeight, const double* kernel, size_t kernelSize);
+	
 	/**
 	 * Prepare a smaller kernel for convolution with ConvolveSameSize. When the kernel is used
 	 * more often, it is more efficient to call PrepareKernel() once and multiple times

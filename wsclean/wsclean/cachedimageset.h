@@ -1,9 +1,10 @@
 #ifndef CACHED_IMAGE_SET_H
 #define CACHED_IMAGE_SET_H
 
-#include "fitswriter.h"
+#include "../fitswriter.h"
+#include "../fitsreader.h"
+
 #include "imagebufferallocator.h"
-#include "fitsreader.h"
 
 #include <string.h>
 #include <set>

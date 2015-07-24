@@ -1,8 +1,8 @@
-#ifndef WS_INVERSION
-#define WS_INVERSION
+#ifndef WS_MS_GRIDDER_H
+#define WS_MS_GRIDDER_H
 
 #include "inversionalgorithm.h"
-#include "layeredimager.h"
+#include "wstackinggridder.h"
 
 #include "../lane.h"
 #include "../multibanddata.h"
@@ -19,21 +19,21 @@ namespace casa {
 template<typename NumType>
 class ImageBufferAllocator;
 
-class WSInversion : public InversionAlgorithm
+class WSMSGridder : public InversionAlgorithm
 {
 	public:
-		WSInversion(class ImageBufferAllocator<double>* imageAllocator, size_t threadCount, double memFraction, double absMemLimit);
+		WSMSGridder(class ImageBufferAllocator<double>* imageAllocator, size_t threadCount, double memFraction, double absMemLimit);
 	
 		virtual void Invert();
 		
 		virtual void Predict(double* image) { Predict(image, 0); }
 		virtual void Predict(double* real, double* imaginary);
 		
-		virtual double *ImageRealResult() const { return _imager->RealImage(); }
+		virtual double *ImageRealResult() const { return _gridder->RealImage(); }
 		virtual double *ImageImaginaryResult() const {
 			if(!IsComplex())
 				throw std::runtime_error("No imaginary result available for non-complex inversion");
-			return _imager->ImaginaryImage();
+			return _gridder->ImaginaryImage();
 		}
 		virtual double PhaseCentreRA() const { return _phaseCentreRA; }
 		virtual double PhaseCentreDec() const { return _phaseCentreDec; }
@@ -48,18 +48,18 @@ class WSInversion : public InversionAlgorithm
 		virtual double PhaseCentreDM() const { return _phaseCentreDM; }
 		virtual double ImageWeight() const { return _totalWeight; }
 		
-		enum LayeredImager::GridModeEnum GridMode() const { return _gridMode; }
-		void SetGridMode(LayeredImager::GridModeEnum gridMode) { _gridMode = gridMode; }
+		enum WStackingGridder::GridModeEnum GridMode() const { return _gridMode; }
+		void SetGridMode(WStackingGridder::GridModeEnum gridMode) { _gridMode = gridMode; }
 		
-		virtual bool HasGriddingCorrectionImage() const { return _gridMode == LayeredImager::KaiserBessel; }
-		virtual void GetGriddingCorrectionImage(double *image) const { _imager->GetGriddingCorrectionImage(image); }
+		virtual bool HasGriddingCorrectionImage() const { return _gridMode == WStackingGridder::KaiserBessel; }
+		virtual void GetGriddingCorrectionImage(double *image) const { _gridder->GetGriddingCorrectionImage(image); }
 		
 		size_t ActualInversionWidth() const { return _actualInversionWidth; }
 		size_t ActualInversionHeight() const { return _actualInversionHeight; }
 		
 		virtual void FreeImagingData()
 		{
-			_imager.reset();
+			_gridder.reset();
 		}
 	private:
 		struct InversionWorkItem
@@ -110,7 +110,7 @@ class WSInversion : public InversionAlgorithm
 			InversionWorkItem workItem;
 			while(workLane->read(workItem))
 			{
-				_imager->AddData(workItem.data, workItem.dataDescId, workItem.u, workItem.v, workItem.w);
+				_gridder->AddData(workItem.data, workItem.dataDescId, workItem.u, workItem.v, workItem.w);
 				delete[] workItem.data;
 			}
 		}
@@ -122,7 +122,7 @@ class WSInversion : public InversionAlgorithm
 		void predictWriteThread(ao::lane<PredictionWorkItem>* samplingWorkLane, const MSData* msData);
 		static void rotateVisibilities(const BandData &bandData, double shiftFactor, std::complex<float>* dataIter);
 
-		std::unique_ptr<LayeredImager> _imager;
+		std::unique_ptr<WStackingGridder> _gridder;
 		std::unique_ptr<ao::lane<InversionWorkItem>> _inversionWorkLane;
 		double _phaseCentreRA, _phaseCentreDec, _phaseCentreDL, _phaseCentreDM;
 		bool _denormalPhaseCentre, _hasFrequencies;
@@ -131,7 +131,7 @@ class WSInversion : public InversionAlgorithm
 		double _beamSize;
 		double _totalWeight;
 		double _startTime;
-		LayeredImager::GridModeEnum _gridMode;
+		WStackingGridder::GridModeEnum _gridMode;
 		size_t _cpuCount, _laneBufferSize;
 		int64_t _memSize;
 		ImageBufferAllocator<double>* _imageBufferAllocator;

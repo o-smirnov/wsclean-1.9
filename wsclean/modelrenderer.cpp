@@ -242,3 +242,50 @@ void ModelRenderer::RenderModel(NumType* imageData, size_t imageWidth, size_t im
 }
 
 template void ModelRenderer::RenderModel(double* imageData, size_t imageWidth, size_t imageHeight, const Model& model, long double startFrequency, long double endFrequency, PolarizationEnum polarization);
+
+void ModelRenderer::RenderInterpolatedSource(double* image, size_t width, size_t height, double flux, double x, double y)
+{
+	ao::uvector<double>
+		hSinc(std::min<size_t>(width,128)+1),
+		vSinc(std::min<size_t>(height,128)+1);
+
+	int midH = hSinc.size()/2;
+	int midV = vSinc.size()/2;
+	
+	double xr = x - floor(x);
+	double yr = y - floor(y);
+	
+	for(size_t i=0; i!=hSinc.size(); ++i)
+	{
+		double xi = (int(i) - midH - xr) * M_PI;
+		if(xi == 0.0)
+			hSinc[i] = 1.0;
+		else
+			hSinc[i] = sin(xi) / xi;
+	}
+	for(size_t i=0; i!=vSinc.size(); ++i)
+	{
+		double yi = (int(i) - midV - yr) * M_PI;
+		if(yi == 0.0)
+			vSinc[i] = 1.0;
+		else
+			vSinc[i] = sin(yi) / yi;
+	}
+	
+	size_t
+		xOffset = floor(x) - midH,
+		yOffset = floor(y) - midV,
+		startX = std::max<int>(xOffset, 0),
+		startY = std::max<int>(yOffset, 0),
+		endX = std::min<size_t>(xOffset + hSinc.size(), width),
+		endY = std::min<size_t>(yOffset + vSinc.size(), height);
+	for(size_t yi=startY; yi!=endY; ++yi)
+	{
+		double* ptr = &image[yi * width];
+		double vFlux = flux * vSinc[yi - yOffset];
+		for(size_t xi=startX; xi!=endX; ++xi)
+		{
+			ptr[xi] += vFlux * hSinc[xi - xOffset];
+		}
+	}
+}

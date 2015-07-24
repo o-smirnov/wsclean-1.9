@@ -101,7 +101,7 @@ public:
 		
 		if(size != _previousSize)
 		{
-			freeUnused();
+			FreeUnused();
 			_previousSize = size;
 		}
 		
@@ -134,7 +134,7 @@ public:
 		
 		if(size != _previousSize)
 		{
-			freeUnused();
+			FreeUnused();
 			_previousSize = size;
 		}
 		
@@ -207,6 +207,28 @@ public:
 		}
 	}
 	
+	void FreeUnused()
+	{
+		size_t unusedCount = 0;
+		typename std::vector<Buffer>::iterator i=_buffers.begin();
+		while(i!=_buffers.end())
+		{
+			if(!i->isFirstHalfUsed && !i->isSecondHalfUsed)
+			{
+				free(i->ptr);
+				_buffers.erase(i);
+				i = _buffers.begin();
+				++unusedCount;
+			} else {
+				++i;
+			}
+		}
+		if(unusedCount != 0)
+		{
+			std::cout << "Freed " << unusedCount << " image buffer(s).\n";
+		}
+	}
+	
 private:
 	struct Buffer
 	{
@@ -236,28 +258,6 @@ private:
 		buffer->isFirstHalfUsed = false;
 		buffer->isSecondHalfUsed = false;
 		return buffer;
-	}
-	
-	void freeUnused()
-	{
-		size_t unusedCount = 0;
-		typename std::vector<Buffer>::iterator i=_buffers.begin();
-		while(i!=_buffers.end())
-		{
-			if(!i->isFirstHalfUsed && !i->isSecondHalfUsed)
-			{
-				free(i->ptr);
-				_buffers.erase(i);
-				i = _buffers.begin();
-				++unusedCount;
-			} else {
-				++i;
-			}
-		}
-		if(unusedCount != 0)
-		{
-			std::cout << "Freed " << unusedCount << " image buffer(s).\n";
-		}
 	}
 	
 	std::vector<Buffer> _buffers;

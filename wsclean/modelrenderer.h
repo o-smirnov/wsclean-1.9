@@ -32,6 +32,12 @@ class ModelRenderer
 		 */
 		template<typename NumType>
 		void RenderModel(NumType* imageData, size_t imageWidth, size_t imageHeight, const class Model& model, long double startFrequency, long double endFrequency, PolarizationEnum polarization);
+		
+		/**
+		 * This will render a source and sinc-interpolate it so it
+		 * can be on non-integer positions.
+		 */
+		static void RenderInterpolatedSource(double* image, size_t width, size_t height, double flux, double x, double y);
 	private:
 		long double _phaseCentreRA;
 		long double _phaseCentreDec;

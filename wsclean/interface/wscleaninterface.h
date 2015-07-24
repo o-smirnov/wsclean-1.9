@@ -1,20 +1,14 @@
-#ifndef WSCLEAN_PURIFY_INTERFACE_H
-#define WSCLEAN_PURIFY_INTERFACE_H
+#ifndef WSCLEAN_INTERFACE_H
+#define WSCLEAN_INTERFACE_H
 
 #include <complex.h>
 
 #include "imaginginterface.h"
 
-#ifndef DCOMPLEX
 #ifdef __cplusplus
-#include <complex>
-#define DCOMPLEX std::complex<double>
 extern "C" {
-#else
-#define DCOMPLEX double complex
 #endif
-#endif
-	
+
 /**
  * Initialize WSClean for use as measurement operator in compressed sensing
  * application. This should be called before any other function.
