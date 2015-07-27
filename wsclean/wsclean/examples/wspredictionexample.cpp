@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 	
 	// Prepare the w-layers. This example disables w-term correction by setting the
 	// number of w-layers to 1, and therefore this call becomes quite simple.
-	// For w-term correction, actually proper w-extremes should have been applied.
+	// For w-term correction, actually proper w-extremes should have been given.
 	// Specifying a memsize will allow the gridder to warn when not enough memory
 	// would be available. Alternatively, a very large number can be given to avoid this.
 	gridder.PrepareWLayers(1, memSize, -1.0, 1.0);

@@ -3,10 +3,10 @@
 
 #include <stdexcept>
 
-#include <ms/MeasurementSets/MeasurementSet.h>
+#include <casacore/ms/MeasurementSets/MeasurementSet.h>
 
-#include <tables/Tables/ArrayColumn.h>
-#include <tables/Tables/ScalarColumn.h>
+#include <casacore/tables/Tables/ArrayColumn.h>
+#include <casacore/tables/Tables/ScalarColumn.h>
 
 #include "banddata.h"
 
@@ -29,7 +29,7 @@ class MultiBandData
 		 * @param spwTable The spectral window table of a measurement set.
 		 * @param dataDescTable The data description table of a measurement set.
 		 */
-		MultiBandData(casa::MSSpectralWindow& spwTable, casa::MSDataDescription& dataDescTable) :
+		MultiBandData(casacore::MSSpectralWindow& spwTable, casacore::MSDataDescription& dataDescTable) :
 		_dataDescToBand(dataDescTable.nrow()),
 		_bandData(spwTable.nrow())
 		{
@@ -38,7 +38,7 @@ class MultiBandData
 				_bandData[spw] = BandData(spwTable, spw);
 			}
 			
-			casa::ROScalarColumn<int> spwColumn(	dataDescTable, casa::MSDataDescription::columnName(casa::MSDataDescriptionEnums::SPECTRAL_WINDOW_ID));
+			casacore::ROScalarColumn<int> spwColumn(	dataDescTable, casacore::MSDataDescription::columnName(casacore::MSDataDescriptionEnums::SPECTRAL_WINDOW_ID));
 			for(size_t id=0; id!=_dataDescToBand.size(); ++id)
 				_dataDescToBand[id] = spwColumn(id);
 		}

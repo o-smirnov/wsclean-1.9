@@ -21,6 +21,7 @@
 template<typename NumType>
 class ImageBufferAllocator;
 
+
 /**
  * This class grids and/or samples visibilities to/from UV space.
  * It also executes the FFT(s) required and performs the w-term correction.
@@ -72,10 +73,15 @@ class ImageBufferAllocator;
  * Prediction does not require any finalisation calls.
  * 
  * @author André Offringa
- * @date 2013 first version
+ * @date 2013 (first version)
  */
 class WStackingGridder
 {
+	/**
+	* @example wspredictionexample.cpp
+	* This example demonstrates how the WStackingGridder can be used in a minimalistic
+	* way to predict visibilities.
+	*/
 	public:
 		/** Gridding modes that are supported for interpolating samples on the uv-grid.
 		 */

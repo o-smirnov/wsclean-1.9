@@ -9,15 +9,15 @@
 
 #include "../msproviders/msprovider.h"
 
-#include <ms/MeasurementSets/MeasurementSet.h>
-#include <measures/Measures/MDirection.h>
-#include <measures/Measures/MCDirection.h>
-#include <measures/Measures/MEpoch.h>
-#include <measures/Measures/MPosition.h>
-#include <measures/Measures/MCPosition.h>
-#include <measures/TableMeasures/ScalarMeasColumn.h>
+#include <casacore/ms/MeasurementSets/MeasurementSet.h>
+#include <casacore/measures/Measures/MDirection.h>
+#include <casacore/measures/Measures/MCDirection.h>
+#include <casacore/measures/Measures/MEpoch.h>
+#include <casacore/measures/Measures/MPosition.h>
+#include <casacore/measures/Measures/MCPosition.h>
+#include <casacore/measures/TableMeasures/ScalarMeasColumn.h>
 
-#include <tables/Tables/ArrColDesc.h>
+#include <casacore/tables/Tables/ArrColDesc.h>
 
 #include <iostream>
 #include <stdexcept>
@@ -58,17 +58,17 @@ void WSMSGridder::initializeMeasurementSet(size_t msIndex, WSMSGridder::MSData& 
 {
 	MSProvider& msProvider = MeasurementSet(msIndex);
 	msData.msProvider = &msProvider;
-	casa::MeasurementSet& ms(msProvider.MS());
+	casacore::MeasurementSet& ms(msProvider.MS());
 	if(ms.nrow() == 0) throw std::runtime_error("Table has no rows (no data)");
 	
 	/**
 		* Read some meta data from the measurement set
 		*/
-	casa::MSAntenna aTable = ms.antenna();
+	casacore::MSAntenna aTable = ms.antenna();
 	size_t antennaCount = aTable.nrow();
 	if(antennaCount == 0) throw std::runtime_error("No antennae in set");
-	casa::MPosition::ROScalarColumn antPosColumn(aTable, aTable.columnName(casa::MSAntennaEnums::POSITION));
-	casa::MPosition ant1Pos = antPosColumn(0);
+	casacore::MPosition::ROScalarColumn antPosColumn(aTable, aTable.columnName(casacore::MSAntennaEnums::POSITION));
+	casacore::MPosition ant1Pos = antPosColumn(0);
 	
 	msData.bandData = MultiBandData(ms.spectralWindow(), ms.dataDescription());
 	if(Selection(msIndex).HasChannelRange())
@@ -89,7 +89,7 @@ void WSMSGridder::initializeMeasurementSet(size_t msIndex, WSMSGridder::MSData& 
 		msData.startChannel = 0;
 		msData.endChannel = msData.bandData.FirstBand().ChannelCount();
 	}
-	casa::MEpoch::ROScalarColumn timeColumn(ms, ms.columnName(casa::MSMainEnums::TIME));
+	casacore::MEpoch::ROScalarColumn timeColumn(ms, ms.columnName(casacore::MSMainEnums::TIME));
 	const MultiBandData selectedBand = msData.SelectedBand();
 	if(_hasFrequencies)
 	{
@@ -107,21 +107,21 @@ void WSMSGridder::initializeMeasurementSet(size_t msIndex, WSMSGridder::MSData& 
 		_hasFrequencies = true;
 	}
 	
-	casa::MSField fTable(ms.field());
-	casa::MDirection::ROScalarColumn phaseDirColumn(fTable, fTable.columnName(casa::MSFieldEnums::PHASE_DIR));
-	casa::MDirection phaseDir = phaseDirColumn(Selection(msIndex).FieldId());
-	casa::MEpoch curtime = timeColumn(0);
-	casa::MeasFrame frame(ant1Pos, curtime);
-	casa::MDirection::Ref j2000Ref(casa::MDirection::J2000, frame);
-	casa::MDirection j2000 = casa::MDirection::Convert(phaseDir, j2000Ref)();
-	casa::Vector<casa::Double> j2000Val = j2000.getValue().get();
+	casacore::MSField fTable(ms.field());
+	casacore::MDirection::ROScalarColumn phaseDirColumn(fTable, fTable.columnName(casacore::MSFieldEnums::PHASE_DIR));
+	casacore::MDirection phaseDir = phaseDirColumn(Selection(msIndex).FieldId());
+	casacore::MEpoch curtime = timeColumn(0);
+	casacore::MeasFrame frame(ant1Pos, curtime);
+	casacore::MDirection::Ref j2000Ref(casacore::MDirection::J2000, frame);
+	casacore::MDirection j2000 = casacore::MDirection::Convert(phaseDir, j2000Ref)();
+	casacore::Vector<casacore::Double> j2000Val = j2000.getValue().get();
 	_phaseCentreRA = j2000Val[0];
 	_phaseCentreDec = j2000Val[1];
 	if(fTable.keywordSet().isDefined("WSCLEAN_DL"))
-		_phaseCentreDL = fTable.keywordSet().asDouble(casa::RecordFieldId("WSCLEAN_DL"));
+		_phaseCentreDL = fTable.keywordSet().asDouble(casacore::RecordFieldId("WSCLEAN_DL"));
 	else _phaseCentreDL = 0.0;
 	if(fTable.keywordSet().isDefined("WSCLEAN_DM"))
-		_phaseCentreDM = fTable.keywordSet().asDouble(casa::RecordFieldId("WSCLEAN_DM"));
+		_phaseCentreDM = fTable.keywordSet().asDouble(casacore::RecordFieldId("WSCLEAN_DM"));
 	else _phaseCentreDM = 0.0;
 
 	_denormalPhaseCentre = _phaseCentreDL != 0.0 || _phaseCentreDM != 0.0;
@@ -134,7 +134,7 @@ void WSMSGridder::initializeMeasurementSet(size_t msIndex, WSMSGridder::MSData& 
 	double maxBaseline = 0.0;
 	std::vector<float> weightArray(selectedBand.MaxChannels());
 	msProvider.Reset();
-	do
+	while(msProvider.CurrentRowAvailable())
 	{
 		size_t dataDescId;
 		double uInM, vInM, wInM;
@@ -173,7 +173,9 @@ void WSMSGridder::initializeMeasurementSet(size_t msIndex, WSMSGridder::MSData& 
 				++weightPtr;
 			}
 		}
-	} while(msProvider.NextRow());
+		
+		msProvider.NextRow();
+	}
 	if(msData.minW == 1e100)
 	{
 		msData.minW = 0.0;
@@ -257,7 +259,7 @@ void WSMSGridder::countSamplesPerLayer(MSData& msData)
 	std::vector<size_t> sampleCount(WGridSize());
 	msData.matchingRows = 0;
 	msData.msProvider->Reset();
-	do
+	while(msData.msProvider->CurrentRowAvailable())
 	{
 		double uInM, vInM, wInM;
 		size_t dataDescId;
@@ -271,7 +273,8 @@ void WSMSGridder::countSamplesPerLayer(MSData& msData)
 				++sampleCount[wLayerIndex];
 		}
 		++msData.matchingRows;
-	} while(msData.msProvider->NextRow());
+		msData.msProvider->NextRow();
+	}
 	std::cout << "Visibility count per layer: ";
 	for(std::vector<size_t>::const_iterator i=sampleCount.begin(); i!=sampleCount.end(); ++i)
 	{
@@ -291,7 +294,7 @@ void WSMSGridder::gridMeasurementSet(MSData &msData)
 	
 	size_t rowsRead = 0;
 	msData.msProvider->Reset();
-	do
+	while(msData.msProvider->CurrentRowAvailable())
 	{
 		size_t dataDescId;
 		double uInMeters, vInMeters, wInMeters;
@@ -391,7 +394,9 @@ void WSMSGridder::gridMeasurementSet(MSData &msData)
 			
 			++rowsRead;
 		}
-	} while(msData.msProvider->NextRow());
+		
+		msData.msProvider->NextRow();
+	}
 	
 	if(Verbose())
 		std::cout << "Rows that were required: " << rowsRead << '/' << msData.matchingRows << '\n';
@@ -474,7 +479,7 @@ void WSMSGridder::predictMeasurementSet(MSData &msData)
 	std::vector<double> us, vs, ws;
 	std::vector<size_t> rowIds, dataIds;
 	msData.msProvider->Reset();
-	do
+	while(msData.msProvider->CurrentRowAvailable())
 	{
 		size_t dataDescId;
 		double uInMeters, vInMeters, wInMeters;
@@ -492,7 +497,9 @@ void WSMSGridder::predictMeasurementSet(MSData &msData)
 			rowIds.push_back(msData.msProvider->RowId());
 			++rowsProcessed;
 		}
-	} while(msData.msProvider->NextRow());
+		
+		msData.msProvider->NextRow();
+	}
 	
 	for(size_t i=0; i!=us.size(); ++i)
 	{

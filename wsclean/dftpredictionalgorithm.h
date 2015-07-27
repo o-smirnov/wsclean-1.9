@@ -147,7 +147,7 @@ public:
 		for(iterator c=begin(); c!=end(); ++c)
 			c->SetUnitaryBeam();
 	}
-	void ConvertApparentToAbsolute(casa::MeasurementSet& ms);
+	void ConvertApparentToAbsolute(casacore::MeasurementSet& ms);
 	
 	const_iterator begin() const { return _components.begin(); }
 	const_iterator end() const { return _components.end(); }

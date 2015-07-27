@@ -4,7 +4,7 @@
 #include "model/model.h"
 #include "progressbar.h"
 
-#include <measures/TableMeasures/ArrayMeasColumn.h>
+#include <casacore/measures/TableMeasures/ArrayMeasColumn.h>
 
 DFTPredictionImage::DFTPredictionImage(size_t width, size_t height, ImageBufferAllocator<double>& allocator) :
 	_width(width),
@@ -155,13 +155,13 @@ struct ComponentInfo
 	std::vector<MC2x2> beamValues;
 };
 	
-void DFTPredictionInput::ConvertApparentToAbsolute(casa::MeasurementSet& ms)
+void DFTPredictionInput::ConvertApparentToAbsolute(casacore::MeasurementSet& ms)
 {
 	std::vector<ComponentInfo> compInfos(_components.size());
 	
 	const BandData band(ms.spectralWindow());
 	LBeamEvaluator evaluator(ms);
-	casa::MEpoch::ROScalarColumn timeColumn(ms, ms.columnName(casa::MSMainEnums::TIME));
+	casacore::MEpoch::ROScalarColumn timeColumn(ms, ms.columnName(casacore::MSMainEnums::TIME));
 	size_t nrow = ms.nrow();
 
 	for(std::vector<ComponentInfo>::iterator cInfo=compInfos.begin(); cInfo!=compInfos.end(); ++cInfo)
@@ -173,7 +173,7 @@ void DFTPredictionInput::ConvertApparentToAbsolute(casa::MeasurementSet& ms)
 	ProgressBar progress("Evaluating beam");
 	for(size_t row=0; row!=nrow; ++row)
 	{
-		casa::MEpoch time = timeColumn(row);
+		casacore::MEpoch time = timeColumn(row);
 		if(time.getValue().get() != evaluator.Time().getValue().get())
 		{
 			evaluator.SetTime(time);

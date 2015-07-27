@@ -369,7 +369,7 @@ void WSClean::dftPredict(const ImagingTable& squaredGroup)
 	}
 	_imageAllocator.Free(modelImageReal);
 	
-	casa::MeasurementSet firstMS(_filenames.front());
+	casacore::MeasurementSet firstMS(_filenames.front());
 	BandData firstBand(firstMS.spectralWindow());
 	DFTPredictionInput input;
 	image->FindComponents(input, _inversionAlgorithm->PhaseCentreRA(), _inversionAlgorithm->PhaseCentreDec(), _pixelScaleX, _pixelScaleY, _inversionAlgorithm->PhaseCentreDL(), _inversionAlgorithm->PhaseCentreDM(), firstBand.ChannelCount());
@@ -394,7 +394,7 @@ void WSClean::dftPredict(const ImagingTable& squaredGroup)
 				const ImagingTableEntry& entry = squaredGroup[i];
 				msProviders[i] = initializeMSProvider(entry, selection, filenameIndex, b);
 			}
-			casa::MeasurementSet ms(msName);
+			casacore::MeasurementSet ms(msName);
 			
 			size_t nRow = ms.nrow();
 			LMSPredicter predicter(ms, _threadCount);
@@ -611,7 +611,7 @@ void WSClean::RunClean()
 	// If no column specified, determine column to use
 	if(_columnName.empty())
 	{
-		casa::MeasurementSet ms(_filenames.front());
+		casacore::MeasurementSet ms(_filenames.front());
 		bool hasCorrected = ms.tableDesc().isColumn("CORRECTED_DATA");
 		if(hasCorrected) {
 			std::cout << "First measurement set has corrected data: tasks will be applied on the corrected data column.\n";
@@ -1173,9 +1173,9 @@ MSSelection WSClean::selectInterval(MSSelection& fullSelection)
 			tE = fullSelection.IntervalEnd();
 		}
 		else {
-			casa::MeasurementSet ms(_filenames[0]);
+			casacore::MeasurementSet ms(_filenames[0]);
 			std::cout << "Counting number of scans... " << std::flush;
-			casa::ROScalarColumn<double> timeColumn(ms, casa::MS::columnName(casa::MSMainEnums::TIME));
+			casacore::ROScalarColumn<double> timeColumn(ms, casacore::MS::columnName(casacore::MSMainEnums::TIME));
 			double time = timeColumn(0);
 			size_t timestepIndex = 0;
 			for(size_t row = 0; row!=ms.nrow(); ++row)
@@ -1219,7 +1219,7 @@ void WSClean::makeImagingTable()
 	_msBands.assign(_filenames.size(), MultiBandData());
 	for(size_t i=0; i!=_filenames.size(); ++i)
 	{
-		casa::MeasurementSet ms(_filenames[i]);
+		casacore::MeasurementSet ms(_filenames[i]);
 		_msBands[i] = MultiBandData(ms.spectralWindow(), ms.dataDescription());
 		for(size_t b=0; b!=_msBands[i].BandCount(); ++b)
 		{

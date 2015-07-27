@@ -10,10 +10,10 @@
 #include <complex>
 #include <memory>
 
-#include <casa/Arrays/Array.h>
-#include <tables/Tables/ArrayColumn.h>
+#include <casacore/casa/Arrays/Array.h>
+#include <casacore/tables/Tables/ArrayColumn.h>
 
-namespace casa {
+namespace casacore {
 	class MeasurementSet;
 }
 template<typename NumType>

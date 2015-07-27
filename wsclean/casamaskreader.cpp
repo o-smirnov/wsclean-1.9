@@ -1,15 +1,15 @@
 #include "casamaskreader.h"
 
-#include <tables/Tables/Table.h>
-#include <tables/Tables/ArrayColumn.h>
+#include <casacore/tables/Tables/Table.h>
+#include <casacore/tables/Tables/ArrayColumn.h>
 
 #include "uvector.h"
 
 CasaMaskReader::CasaMaskReader(const std::string& path) : _path(path)
 {
-	casa::Table table(path);
-	casa::ROArrayColumn<float> mapCol(table, "map");
-	casa::IPosition shape = mapCol.shape(0);
+	casacore::Table table(path);
+	casacore::ROArrayColumn<float> mapCol(table, "map");
+	casacore::IPosition shape = mapCol.shape(0);
 	_width = shape(0);
 	_height = shape(1);
 	_nPolarizations = shape(2);
@@ -18,12 +18,12 @@ CasaMaskReader::CasaMaskReader(const std::string& path) : _path(path)
 
 void CasaMaskReader::Read(bool* mask)
 {
-	casa::Table table(_path);
-	casa::ROArrayColumn<float> mapCol(table, "map");
-	casa::Array<float> data(mapCol.get(0));
+	casacore::Table table(_path);
+	casacore::ROArrayColumn<float> mapCol(table, "map");
+	casacore::Array<float> data(mapCol.get(0));
 	for(size_t i=0; i!=_width*_height; ++i)
 		mask[i] = false;
-	casa::Array<float>::contiter iter = data.cbegin();
+	casacore::Array<float>::contiter iter = data.cbegin();
 	bool* maskPtr = mask;
 	for(size_t j=0; j!=_nChannels*_nPolarizations; ++j)
 	{
