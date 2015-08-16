@@ -11,13 +11,17 @@
 class IUWTDeconvolutionAlgorithm
 {
 public:
-	IUWTDeconvolutionAlgorithm(size_t width, size_t height, double gain, double mGain, double cleanBorder, double thresholdLevel=4.0, double tolerance=0.75);
+	IUWTDeconvolutionAlgorithm(size_t width, size_t height, double gain, double mGain, double cleanBorder, bool allowNegativeComponents, double thresholdLevel=4.0, double tolerance=0.75);
 	
 	void PerformMajorIteration(size_t& iterCounter, size_t nIter, double* model, double* dirty, const double* psf, bool& reachedMajorThreshold);
 	
 	void PerformMajorIteration(size_t& iterCounter, size_t nIter, class DynamicSet& modelSet, class DynamicSet& dirtySet, const ao::uvector<const double*>& psfs, bool& reachedMajorThreshold);
 	
-	void Subtract(ao::uvector<double>& dest, const ao::uvector<double>& rhs);
+	void Subtract(double* dest, const ao::uvector<double>& rhs);
+	void Subtract(ao::uvector<double>& dest, const ao::uvector<double>& rhs)
+	{
+		Subtract(dest.data(), rhs);
+	}
 	
 private:
 	struct ValComponent
@@ -89,7 +93,7 @@ private:
 	
 	void performSubImageFitAll(IUWTDecomposition& iuwt, const IUWTMask& mask, const ao::uvector<double>& structureModel, ao::uvector<double>& scratchA, ao::uvector<double>& scratchB, const ImageAnalysis::Component& maxComp, DynamicSet& fittedModel, const double* psf, const ao::uvector<double>& dirty);
 	
-	void performSubImageFitSingle(IUWTDecomposition& iuwt, const IUWTMask& mask, const ao::uvector<double>& structureModel, ao::uvector<double>& scratchB, const ImageAnalysis::Component& maxComp, const double* psf, ao::uvector<double>& subDirty, ao::uvector<double>* fittedSubModel, ao::uvector<double>& correctionFactors);
+	void performSubImageFitSingle(IUWTDecomposition& iuwt, const IUWTMask& mask, const ao::uvector<double>& structureModel, ao::uvector<double>& scratchB, const ImageAnalysis::Component& maxComp, const double* psf, ao::uvector<double>& subDirty, double* fittedSubModel, ao::uvector<double>& correctionFactors);
 	
 	double performSubImageComponentFitBoxed(IUWTDecomposition& iuwt, const IUWTMask& mask, const std::vector<ImageAnalysis::Component2D>& area, ao::uvector<double>& scratch, ao::uvector<double>& maskedDirty, const double* psf, const ao::uvector<double>& psfKernel, size_t x1, size_t y1, size_t x2, size_t y2);
 	

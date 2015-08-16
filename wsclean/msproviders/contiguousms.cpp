@@ -69,8 +69,11 @@ bool ContiguousMS::CurrentRowAvailable()
 	if(_row >= _endRow)
 		return false;
 		
-	int fieldId, a1, a2;
-	casacore::Vector<double> uvw;
+	int fieldId = _fieldIdColumn(_row);
+	int a1 = _antenna1Column(_row);
+	int a2 = _antenna2Column(_row);
+	casacore::Vector<double> uvw = _uvwColumn(_row);
+	
 	while(!_selection.IsSelected(fieldId, _timestep, a1, a2, uvw)) {
 		++_row;
 		if(_row >= _endRow)

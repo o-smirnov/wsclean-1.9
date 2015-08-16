@@ -11,42 +11,43 @@
 
 #ifndef USE_DIRECT_ALLOCATOR
 
-template<typename NumType>
 class ImageBufferAllocator
 {
 public:
 	class Ptr
 	{
 	public:
-		friend class ImageBufferAllocator<NumType>;
+		friend class ImageBufferAllocator;
 		Ptr()
 			: _data(0) { }
-		Ptr(NumType* data, ImageBufferAllocator<NumType>& allocator) 
+		Ptr(double* data, ImageBufferAllocator& allocator) 
 			: _data(data), _allocator(&allocator) { }
 		~Ptr()
 		{
 			reset();
 		}
-		NumType* data() const { return _data; }
-		NumType& operator*() const { return *_data; }
+		double* data() const { return _data; }
+		double& operator*() const { return *_data; }
 		void reset()
 		{
+			// We have to check for nullptr, because the _allocator might not be set.
 			if(_data != 0) _allocator->Free(_data);
 			_data = 0;
 		}
-		void reset(NumType* data, ImageBufferAllocator<NumType>& allocator)
+		void reset(double* data, ImageBufferAllocator& allocator)
 		{
-			reset();
+			// We have to check for nullptr, because the _allocator might not be set.
+			if(_data != 0) _allocator->Free(_data);
 			_data = data;
 			_allocator = &allocator;
 		}
-		NumType& operator[](size_t index) const { return _data[index]; }
+		double& operator[](size_t index) const { return _data[index]; }
 	private:
 		Ptr(const Ptr&) { }
 		void operator=(const Ptr&) { }
 		
-		NumType* _data;
-		ImageBufferAllocator<NumType>* _allocator;
+		double* _data;
+		ImageBufferAllocator* _allocator;
 	};
 	
 	ImageBufferAllocator() : _buffers(), _nReal(0), _nComplex(0), _nRealMax(0), _nComplexMax(0), _previousSize(0)
@@ -82,7 +83,7 @@ public:
 		double totalSize = 0.0;
 		for(typename std::vector<Buffer>::const_iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 		{
-			totalSize += double(i->size) * double(sizeof(NumType)*2);
+			totalSize += double(i->size) * double(sizeof(double)*2);
 		}
 		std::cout << "Image buf alloc stats:\n"
 			"         max alloc'd images = " << _nRealMax << " real + " << _nComplexMax << " complex\n"
@@ -95,7 +96,7 @@ public:
 		ptr.reset(Allocate(size), *this);
 	}
 	
-	NumType* Allocate(size_t size)
+	double* Allocate(size_t size)
 	{
 		std::lock_guard<std::mutex> guard(_mutex);
 		
@@ -128,7 +129,7 @@ public:
 		return newBuffer->ptr;
 	}
 	
-	std::complex<NumType>* AllocateComplex(size_t size)
+	std::complex<double>* AllocateComplex(size_t size)
 	{
 		std::lock_guard<std::mutex> guard(_mutex);
 		
@@ -148,17 +149,17 @@ public:
 				{
 					i->isFirstHalfUsed = true;
 					i->isSecondHalfUsed = true;
-					return reinterpret_cast<std::complex<NumType>*>(i->ptr);
+					return reinterpret_cast<std::complex<double>*>(i->ptr);
 				}
 			}
 		}
 		Buffer* newBuffer = allocateNewBuffer(size);
 		newBuffer->isFirstHalfUsed = true;
 		newBuffer->isSecondHalfUsed = true;
-		return reinterpret_cast<std::complex<NumType>*>(newBuffer->ptr);
+		return reinterpret_cast<std::complex<double>*>(newBuffer->ptr);
 	}
 	
-	void Free(NumType* buffer)
+	void Free(double* buffer)
 	{
 		if(buffer != 0)
 		{
@@ -180,12 +181,12 @@ public:
 				}
 			}
 			if(!found)
-				throw std::runtime_error("Invalid or double call to ImageBufferAllocator::Free(NumType*).");
+				throw std::runtime_error("Invalid or double call to ImageBufferAllocator::Free(double*).");
 			--_nReal;
 		}
 	}
 	
-	void Free(std::complex<NumType>* buffer)
+	void Free(std::complex<double>* buffer)
 	{
 		if(buffer != 0)
 		{
@@ -193,7 +194,7 @@ public:
 			bool found = false;
 			for(typename std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 			{
-				if(i->ptr == reinterpret_cast<NumType*>(buffer))
+				if(i->ptr == reinterpret_cast<double*>(buffer))
 				{
 					found = true;
 					i->isFirstHalfUsed = false;
@@ -202,7 +203,7 @@ public:
 				}
 			}
 			if(!found)
-				throw std::runtime_error("Invalid or double call to ImageBufferAllocator::Free(std::complex<NumType>*).");
+				throw std::runtime_error("Invalid or double call to ImageBufferAllocator::Free(std::complex<double>*).");
 			--_nComplex;
 		}
 	}
@@ -232,7 +233,7 @@ public:
 private:
 	struct Buffer
 	{
-		NumType* ptr;
+		double* ptr;
 		size_t size;
 		bool isFirstHalfUsed, isSecondHalfUsed;
 	};
@@ -241,7 +242,7 @@ private:
 	{
 		_buffers.push_back(Buffer());
 		Buffer* buffer = &_buffers.back();
-		int errVal = posix_memalign(reinterpret_cast<void**>(&buffer->ptr), sizeof(NumType)*2, size * sizeof(NumType) * 2);
+		int errVal = posix_memalign(reinterpret_cast<void**>(&buffer->ptr), sizeof(double)*2, size*sizeof(double) * 2);
 		if(errVal != 0)
 		{
 			switch(errVal)
@@ -267,7 +268,6 @@ private:
 
 #else // USE_DIRECT_ALLOCATOR
 
-template<typename NumType>
 class ImageBufferAllocator
 {
 public:
@@ -275,22 +275,22 @@ public:
 	{
 	}
 	
-	NumType* Allocate(size_t size)
+	double* Allocate(size_t size)
 	{
-		return new NumType[size];
+		return new double[size];
 	}
 	
-	std::complex<NumType>* AllocateComplex(size_t size)
+	std::complex<double>* AllocateComplex(size_t size)
 	{
-		return new std::complex<NumType>[size];
+		return new std::complex<double>[size];
 	}
 	
-	void Free(NumType* buffer)
+	void Free(double* buffer)
 	{
 		delete[] buffer;
 	}
 	
-	void Free(std::complex<NumType>* buffer)
+	void Free(std::complex<double>* buffer)
 	{
 		delete[] buffer;
 	}

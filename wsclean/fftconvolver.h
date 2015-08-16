@@ -3,6 +3,8 @@
 
 #include <cstring>
 
+#include <boost/thread/thread.hpp>
+
 class FFTConvolver {
 	
 public:
@@ -36,6 +38,8 @@ public:
 	static void ConvolveSameSize(double* image, const double* kernel, size_t imgWidth, size_t imgHeight);
 	
 	static void Reverse(double* image, size_t imgWidth, size_t imgHeight);
+private:
+	static boost::mutex _mutex;
 };
 
 #endif

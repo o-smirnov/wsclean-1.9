@@ -16,13 +16,12 @@
 namespace casacore {
 	class MeasurementSet;
 }
-template<typename NumType>
 class ImageBufferAllocator;
 
 class WSMSGridder : public InversionAlgorithm
 {
 	public:
-		WSMSGridder(class ImageBufferAllocator<double>* imageAllocator, size_t threadCount, double memFraction, double absMemLimit);
+		WSMSGridder(class ImageBufferAllocator* imageAllocator, size_t threadCount, double memFraction, double absMemLimit);
 	
 		virtual void Invert();
 		
@@ -134,7 +133,7 @@ class WSMSGridder : public InversionAlgorithm
 		WStackingGridder::GridModeEnum _gridMode;
 		size_t _cpuCount, _laneBufferSize;
 		int64_t _memSize;
-		ImageBufferAllocator<double>* _imageBufferAllocator;
+		ImageBufferAllocator* _imageBufferAllocator;
 		size_t _actualInversionWidth, _actualInversionHeight;
 		double _actualPixelSizeX, _actualPixelSizeY;
 };

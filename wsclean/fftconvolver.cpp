@@ -7,6 +7,8 @@
 #include <complex>
 #include <stdexcept>
 
+boost::mutex FFTConvolver::_mutex;
+
 void FFTConvolver::Convolve(double* image, size_t imgWidth, size_t imgHeight, const double* kernel, size_t kernelSize)
 {
 	ao::uvector<double> scaledKernel(imgWidth * imgHeight, 0.0);
@@ -115,8 +117,11 @@ void FFTConvolver::ConvolveSameSize(double* image, const double* kernel, size_t 
 	double* tempData = reinterpret_cast<double*>(fftw_malloc(imgSize * sizeof(double)));
 	fftw_complex* fftImageData = reinterpret_cast<fftw_complex*>(fftw_malloc(complexSize * sizeof(fftw_complex)));
 	fftw_complex* fftKernelData = reinterpret_cast<fftw_complex*>(fftw_malloc(complexSize * sizeof(fftw_complex)));
+	
+	boost::mutex::scoped_lock lock(_mutex);
 	fftw_plan inToFPlan = fftw_plan_dft_r2c_2d(imgHeight, imgWidth, tempData, fftImageData, FFTW_ESTIMATE);
 	fftw_plan fToOutPlan = fftw_plan_dft_c2r_2d(imgHeight, imgWidth, fftImageData, tempData, FFTW_ESTIMATE);
+	lock.unlock();
 	
 	memcpy(tempData, image, imgSize * sizeof(double));
 	fftw_execute_dft_r2c(inToFPlan, tempData, fftImageData);
@@ -135,8 +140,10 @@ void FFTConvolver::ConvolveSameSize(double* image, const double* kernel, size_t 
 	fftw_free(fftKernelData);
 	fftw_free(tempData);
 	
+	lock.lock();
 	fftw_destroy_plan(inToFPlan);
 	fftw_destroy_plan(fToOutPlan);
+	lock.unlock();
 }
 
 void FFTConvolver::Reverse(double* image, size_t imgWidth, size_t imgHeight)

@@ -26,7 +26,7 @@ namespace deconvolution {
 		{
 		}
 		
-		SingleImageSet(size_t size, ImageBufferAllocator<double>& allocator) :
+		SingleImageSet(size_t size, ImageBufferAllocator& allocator) :
 			image(allocator.Allocate(size)),
 			_allocator(&allocator)
 		{
@@ -89,13 +89,13 @@ namespace deconvolution {
 		{
 			return 0;
 		}
-		ImageBufferAllocator<double>* Allocator() { return _allocator; }
+		ImageBufferAllocator* Allocator() { return _allocator; }
 		
 		double* Data() { return image; }
 	private:
 		double *image;
 		
-		ImageBufferAllocator<double> *_allocator;
+		ImageBufferAllocator* _allocator;
 	};
 	
 	template<size_t PolCount>
@@ -121,7 +121,7 @@ namespace deconvolution {
 				images[i] = _allocator->Allocate(size);
 		}
 		
-		PolarizedImageSet(size_t size, ImageBufferAllocator<double>& allocator) :
+		PolarizedImageSet(size_t size, ImageBufferAllocator& allocator) :
 			_allocator(&allocator)
 		{
 			for(size_t i=0; i!=PolCount; ++i)
@@ -238,11 +238,11 @@ namespace deconvolution {
 		{
 			return 0;
 		}
-		ImageBufferAllocator<double>* Allocator() { return _allocator; }
+		ImageBufferAllocator* Allocator() { return _allocator; }
 	private:
 		double *images[PolCount];
 		
-		ImageBufferAllocator<double> *_allocator;
+		ImageBufferAllocator* _allocator;
 	};
 	
 	template<typename SingleImageSetType>
@@ -265,7 +265,7 @@ namespace deconvolution {
 			}
 		}
 		
-		MultiImageSet(size_t imageSize, size_t count, ImageBufferAllocator<double>& allocator)
+		MultiImageSet(size_t imageSize, size_t count, ImageBufferAllocator& allocator)
 		{
 			for(size_t i=0; i!=count; ++i)
 			{
@@ -363,7 +363,7 @@ namespace deconvolution {
 		{
 			return imageIndex/SingleImageSetType::StaticImageCount();
 		}
-		ImageBufferAllocator<double>* Allocator()
+		ImageBufferAllocator* Allocator()
 		{ 
 			return _sets.front()->Allocator();
 		}

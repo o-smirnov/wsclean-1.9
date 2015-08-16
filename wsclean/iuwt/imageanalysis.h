@@ -53,7 +53,7 @@ private:
 		if(threshold >= 0.0)
 			return val > threshold;
 		else
-			return val < threshold;
+			return val < threshold || val > -threshold;
 	}
 	static bool exceedsThresholdAbs(double val, double threshold)
 	{

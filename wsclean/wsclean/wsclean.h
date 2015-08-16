@@ -249,7 +249,7 @@ private:
 	
 	std::unique_ptr<class InversionAlgorithm> _inversionAlgorithm;
 	std::unique_ptr<class ImageWeightCache> _imageWeightCache;
-	ImageBufferAllocator<double> _imageAllocator;
+	ImageBufferAllocator _imageAllocator;
 	Stopwatch _inversionWatch, _predictingWatch, _deconvolutionWatch;
 	bool _isFirstInversion, _doReorder;
 	size_t _currentIntervalIndex, _majorIterationNr;

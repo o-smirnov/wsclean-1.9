@@ -4,7 +4,8 @@
 #include "joinedclean.h"
 #include "simpleclean.h"
 #include "moresane.h"
-#include "multiscaleclean.h"
+#include "multiscaledeconvolution.h"
+#include "fastmultiscaleclean.h"
 #include "iuwtdeconvolution.h"
 
 #include "../casamaskreader.h"
@@ -15,7 +16,7 @@ Deconvolution::Deconvolution() :
 	_nIter(0),
 	_allowNegative(true), 
 	_stopOnNegative(false),
-	_multiscale(false),
+	_multiscale(false), _fastMultiscale(false),
 	_multiscaleThresholdBias(0.7), _multiscaleScaleBias(0.6),
 	_cleanBorderRatio(0.05),
 	_fitsMask(), _casaMask(),
@@ -34,7 +35,7 @@ void Deconvolution::Perform(const class ImagingTable& groupTable, bool& reachedM
 {
 	std::cout << std::flush << " == Cleaning (" << majorIterationNr << ") ==\n";
 	
-	if(_useIUWT)
+	if(_useIUWT || _multiscale)
 		performDynamicClean(groupTable, reachedMajorThreshold, majorIterationNr);
 	else if(_summedCount != 1)
 	{
@@ -61,22 +62,22 @@ void Deconvolution::performDynamicClean(const class ImagingTable& groupTable, bo
 {
 	_imageAllocator->FreeUnused();
 	DynamicSet
-		residualSet(&groupTable, _imgWidth, _imgHeight),
-		modelSet(&groupTable, _imgWidth, _imgHeight);
+		residualSet(&groupTable, *_imageAllocator, _imgWidth, _imgHeight),
+		modelSet(&groupTable, *_imageAllocator, _imgWidth, _imgHeight);
 	size_t imgIndex = 0;
 	for(size_t i=0; i!=groupTable.EntryCount(); ++i)
 	{
 		const ImagingTableEntry& e = groupTable[i];
 		if(e.imageCount >= 1)
 		{
-			_residualImages->Load(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
-			_modelImages->Load(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
+			_residualImages->Load(residualSet[imgIndex], e.polarization, e.outputChannelIndex, false);
+			_modelImages->Load(modelSet[imgIndex], e.polarization, e.outputChannelIndex, false);
 			++imgIndex;
 		}
 		if(e.imageCount == 2)
 		{
-			_residualImages->Load(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
-			_modelImages->Load(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
+			_residualImages->Load(residualSet[imgIndex], e.polarization, e.outputChannelIndex, true);
+			_modelImages->Load(modelSet[imgIndex], e.polarization, e.outputChannelIndex, true);
 			++imgIndex;
 		}
 	}
@@ -115,14 +116,14 @@ void Deconvolution::performDynamicClean(const class ImagingTable& groupTable, bo
 		const ImagingTableEntry& e = groupTable[i];
 		if(e.imageCount >= 1)
 		{
-			_residualImages->Store(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
-			_modelImages->Store(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, false);
+			_residualImages->Store(residualSet[imgIndex], e.polarization, e.outputChannelIndex, false);
+			_modelImages->Store(modelSet[imgIndex], e.polarization, e.outputChannelIndex, false);
 			++imgIndex;
 		}
 		if(e.imageCount == 2)
 		{
-			_residualImages->Store(residualSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
-			_modelImages->Store(modelSet[imgIndex].data(), e.polarization, e.outputChannelIndex, true);
+			_residualImages->Store(residualSet[imgIndex], e.polarization, e.outputChannelIndex, true);
+			_modelImages->Store(modelSet[imgIndex], e.polarization, e.outputChannelIndex, true);
 			++imgIndex;
 		}
 	}
@@ -133,7 +134,7 @@ void Deconvolution::performSimpleClean(size_t currentChannelIndex, bool& reached
 	deconvolution::SingleImageSet
 		residualImage(_imgWidth*_imgHeight, *_imageAllocator),
 		modelImage(_imgWidth*_imgHeight, *_imageAllocator);
-	ImageBufferAllocator<double>::Ptr psfImage;
+	ImageBufferAllocator::Ptr psfImage;
 	_imageAllocator->Allocate(_imgWidth*_imgHeight, psfImage);
 		
 	_residualImages->Load(residualImage.Data(), polarization, currentChannelIndex, false);
@@ -156,7 +157,7 @@ void Deconvolution::performJoinedPolClean(size_t currentChannelIndex, bool& reac
 		modelSet(_imgWidth*_imgHeight, *_imageAllocator),
 		residualSet(_imgWidth*_imgHeight, *_imageAllocator);
 	
-	ImageBufferAllocator<double>::Ptr psfImage;
+	ImageBufferAllocator::Ptr psfImage;
 	_imageAllocator->Allocate(_imgWidth*_imgHeight, psfImage);
 	_psfImages->Load(psfImage.data(), _psfPolarization, currentChannelIndex, false);
 	
@@ -178,7 +179,7 @@ void Deconvolution::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_
 		modelSet(_imgWidth*_imgHeight, _summedCount, *_imageAllocator),
 		residualSet(_imgWidth*_imgHeight, _summedCount, *_imageAllocator);
 	
-	std::vector<ImageBufferAllocator<double>::Ptr> psfImagePtrs(_summedCount);
+	std::vector<ImageBufferAllocator::Ptr> psfImagePtrs(_summedCount);
 	std::vector<double*> psfImages(_summedCount);
 	for(size_t ch=0; ch!=_summedCount; ++ch)
 	{
@@ -204,7 +205,7 @@ void Deconvolution::FreeDeconvolutionAlgorithms()
 	_cleanAlgorithm.reset();
 }
 
-void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTable, PolarizationEnum psfPolarization, class ImageBufferAllocator<double>* imageAllocator, size_t imgWidth, size_t imgHeight, double pixelScaleX, double pixelScaleY, size_t outputChannels, double beamSize, size_t threadCount)
+void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTable, PolarizationEnum psfPolarization, class ImageBufferAllocator* imageAllocator, size_t imgWidth, size_t imgHeight, double pixelScaleX, double pixelScaleY, size_t outputChannels, double beamSize, size_t threadCount)
 {
 	_imageAllocator = imageAllocator;
 	_imgWidth = imgWidth;
@@ -234,6 +235,10 @@ void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTa
 	{
 		_cleanAlgorithm.reset(new IUWTDeconvolution());
 	}
+	else if(_multiscale)
+	{
+		_cleanAlgorithm.reset(new MultiScaleDeconvolution(*_imageAllocator, beamSize, pixelScaleX, pixelScaleY));
+	}
 	else if(_squaredCount != 1)
 	{
 		if(_squaredCount != 2 && _squaredCount != 4)
@@ -245,18 +250,18 @@ void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTa
 			
 		if(_summedCount != 1)
 		{
-			if(_multiscale)
+			if(_fastMultiscale)
 			{
 				if(_squaredCount == 4)
 				{
 					_cleanAlgorithm.reset(
-					new MultiScaleClean
+					new FastMultiScaleClean
 					<deconvolution::MultiImageSet
 					<deconvolution::PolarizedImageSet<4>>>(beamSize, pixelScaleX, pixelScaleY));
 				}
 				else {
 					_cleanAlgorithm.reset(
-					new MultiScaleClean
+					new FastMultiScaleClean
 					<deconvolution::MultiImageSet<deconvolution::PolarizedImageSet<2>>>(beamSize, pixelScaleX, pixelScaleY));
 				}
 			}
@@ -268,12 +273,12 @@ void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTa
 			}
 		}
 		else {
-			if(_multiscale)
+			if(_fastMultiscale)
 			{
 				if(_squaredCount == 4)
-					_cleanAlgorithm.reset(new MultiScaleClean<deconvolution::PolarizedImageSet<4>>(beamSize, pixelScaleX, pixelScaleY));
+					_cleanAlgorithm.reset(new FastMultiScaleClean<deconvolution::PolarizedImageSet<4>>(beamSize, pixelScaleX, pixelScaleY));
 				else
-					_cleanAlgorithm.reset(new MultiScaleClean<deconvolution::PolarizedImageSet<2>>(beamSize, pixelScaleX, pixelScaleY));
+					_cleanAlgorithm.reset(new FastMultiScaleClean<deconvolution::PolarizedImageSet<2>>(beamSize, pixelScaleX, pixelScaleY));
 			}
 			else
 			{
@@ -287,14 +292,14 @@ void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTa
 	else { // squaredCount == 1
 		if(_summedCount != 1)
 		{
-			if(_multiscale)
-				_cleanAlgorithm.reset(new MultiScaleClean<deconvolution::MultiImageSet<deconvolution::SingleImageSet>>(beamSize, pixelScaleX, pixelScaleY));
+			if(_fastMultiscale)
+				_cleanAlgorithm.reset(new FastMultiScaleClean<deconvolution::MultiImageSet<deconvolution::SingleImageSet>>(beamSize, pixelScaleX, pixelScaleY));
 			else
 				_cleanAlgorithm.reset(new JoinedClean<deconvolution::MultiImageSet<deconvolution::SingleImageSet>>());
 		}
 		else {
-			if(_multiscale)
-				_cleanAlgorithm.reset(new MultiScaleClean<deconvolution::SingleImageSet>(beamSize, pixelScaleX, pixelScaleY));
+			if(_fastMultiscale)
+				_cleanAlgorithm.reset(new FastMultiScaleClean<deconvolution::SingleImageSet>(beamSize, pixelScaleX, pixelScaleY));
 			else
 				_cleanAlgorithm.reset(new SimpleClean());
 		}

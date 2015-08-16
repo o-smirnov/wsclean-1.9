@@ -10,7 +10,7 @@
 int main(int argc, char* argv[])
 {
 	size_t width = 4000, height = 4000;
-	double pixelScale = 1.0/60.0*(M_PI/180.0);     // one arcsec in radians
+	double pixelScale = 1.0/60.0*(M_PI/180.0);          // one arcmin in radians
 	size_t threadCount = sysconf(_SC_NPROCESSORS_ONLN); // number of CPUs in system
 	
 	// Calculate available memory

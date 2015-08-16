@@ -18,14 +18,13 @@
 #include <vector>
 #include <stack>
 
-template<typename NumType>
 class ImageBufferAllocator;
-
 
 /**
  * This class grids and/or samples visibilities to/from UV space.
  * It also executes the FFT(s) required and performs the w-term correction.
- * It does this with the 'w-stacking' method (see Offringa et al., 2013).
+ * It does this with the 'w-stacking' method (see
+ * [Offringa et al., 2014](http://arxiv.org/abs/1407.1943)).
  * 
  * This class is quite generic in that it is agnostic to the underlying data format 
  * of the visibilities, and it is written to be of high performance. It is used
@@ -74,6 +73,7 @@ class ImageBufferAllocator;
  * 
  * @author André Offringa
  * @date 2013 (first version)
+ * @sa [WSClean: an implementation of a fast, generic wide-field imager for radio astronomy](http://arxiv.org/abs/1407.1943)
  */
 class WStackingGridder
 {
@@ -115,7 +115,7 @@ class WStackingGridder
 		 *   but requires more memory and becomes slower, probably mainly due to cache misses.
 		 * @todo Fix width/height requirement.
 		 */
-		WStackingGridder(size_t width, size_t height, double pixelSizeX, double pixelSizeY, size_t fftThreadCount, ImageBufferAllocator<double>* allocator, size_t kernelSize = 7, size_t overSamplingFactor = 63);
+		WStackingGridder(size_t width, size_t height, double pixelSizeX, double pixelSizeY, size_t fftThreadCount, ImageBufferAllocator* allocator, size_t kernelSize = 7, size_t overSamplingFactor = 63);
 		
 		/** De-allocate imagebuffers with the allocator and perform other clean-up. */
 		~WStackingGridder();
@@ -379,6 +379,19 @@ class WStackingGridder
 #endif
 		
 		/**
+		 * Predict the value of a single visibility with double precision.
+		 * If the visibility can not be predicted,
+		 * because its w-value belongs to a w-layer that is not processed during this pass,
+		 * it will be given a value of NaN.
+		 * A call to @ref StartPredictionPass() should have been made before calling this method.
+		 * @param value Will be set to the predicted visibility value.
+		 * @param uInLambda U value of UVW coordinate, in number of wavelengths.
+		 * @param vInLambda V value of UVW coordinate, in number of wavelengths.
+		 * @param wInLambda W value of UVW coordinate, in number of wavelengths.
+		 */
+		void SampleDataSample(std::complex<double>& value, double uInLambda, double vInLambda, double wInLambda);
+		
+		/**
 		 * Predict the value of a single visibility. If the visibility can not be predicted,
 		 * because its w-value belongs to a w-layer that is not processed during this pass,
 		 * it will be given a value of NaN.
@@ -388,7 +401,12 @@ class WStackingGridder
 		 * @param vInLambda V value of UVW coordinate, in number of wavelengths.
 		 * @param wInLambda W value of UVW coordinate, in number of wavelengths.
 		 */
-		void SampleDataSample(std::complex<float>& value, double uInLambda, double vInLambda, double wInLambda);
+		void SampleDataSample(std::complex<float>& value, double uInLambda, double vInLambda, double wInLambda)
+		{
+			std::complex<double> doubleValue;
+			SampleDataSample(doubleValue, uInLambda, vInLambda, wInLambda);
+			value = doubleValue;
+		}
 		
 		/**
 		 * Get the image result of inversion. This is an array of size width x height, and can be
@@ -467,7 +485,8 @@ class WStackingGridder
 		 * of this can be that the phase centre can be set to zenith, thereby minimizing
 		 * w-values, while the actually imaged field is somewhere else, thereby making
 		 * it possible to handle non-zenith images with small image sizes and small w-values.
-		 * A more extended explanation is given in the WSClean paper by Offringa et al. (2013)
+		 * A more extended explanation is given in the WSClean paper by
+		 * [Offringa et al. (2014)](http://arxiv.org/abs/1407.1943).
 		 * @param dl shift of image centre in 'l' (East) direction
 		 * @param dm shift of image centre in 'm' (North) direction
 		 */
@@ -507,6 +526,25 @@ class WStackingGridder
 		 * @param newBuffer The new imaginary buffer part.
 		 */
 		void ReplaceImaginaryImageBuffer(double* newBuffer);
+		
+		/**
+		 * Retrieve a gridded uv layer. This function can be called after
+		 * @ref StartInversionPass() was called, and before @ref FinishInversionPass()
+		 * is called.
+		 * @param layerIndex Layer index of the grid, with zero being the first
+		 * layer of the current pass.
+		 * @returns The layer, with the currently gridded samples on it.
+		 */
+		const std::complex<double>* GetGriddedUVLayer(size_t layerIndex) const
+		{
+			return _layeredUVData[layerIndex];
+		}
+		
+		size_t Width() const { return _width; }
+		size_t Height() const { return _height; }
+		double PixelSizeX() const { return _pixelSizeX; }
+		double PixelSizeY() const { return _pixelSizeY; }
+		ImageBufferAllocator* Allocator() const { return _imageBufferAllocator; }
 	private:
 		size_t layerRangeStart(size_t layerRangeIndex) const
 		{
@@ -547,7 +585,7 @@ class WStackingGridder
 		std::vector<double*> _imageData, _imageDataImaginary;
 		std::vector<double> _sqrtLMLookupTable;
 		size_t _nFFTThreads;
-		ImageBufferAllocator<double>* _imageBufferAllocator;
+		ImageBufferAllocator* _imageBufferAllocator;
 };
 
 #endif

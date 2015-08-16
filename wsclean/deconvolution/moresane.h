@@ -21,7 +21,7 @@ class MoreSane : public TypedDeconvolutionAlgorithm<deconvolution::SingleImageSe
 		void ExecuteMajorIteration(double* dataImage, double* modelImage, const double* psfImage, size_t width, size_t height, bool& reachedMajorThreshold);
 	private:
 		const std::string _moresaneLocation, _moresaneArguments;
-		ImageBufferAllocator<double>* _allocator;
+		ImageBufferAllocator* _allocator;
 };
 
 #endif

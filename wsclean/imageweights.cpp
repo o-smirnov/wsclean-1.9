@@ -23,27 +23,6 @@ ImageWeights::ImageWeights(const WeightMode& weightMode, size_t imageWidth, size
 	_grid.assign(_imageWidth*_imageHeight/2, 0.0);
 }
 
-double ImageWeights::ApplyWeights(std::complex<float> *data, const bool *flags, double uTimesLambda, double vTimesLambda, size_t channelCount, double lowestFrequency, double frequencyStep)
-{
-	double weightSum = 0.0;
-	for(size_t ch=0;ch!=channelCount;++ch)
-	{
-		if(flags[ch])
-		{
-			data[ch] = 0.0;
-		} else
-		{
-			double wavelength = frequencyToWavelength(lowestFrequency + frequencyStep*ch);
-			double u = uTimesLambda/wavelength;
-			double v = vTimesLambda/wavelength;
-			double weight = GetWeight(u, v);
-			weightSum += weight;
-			data[ch] *= weight;
-		}
-	}
-	return weightSum / channelCount;
-}
-
 void ImageWeights::Grid(casacore::MeasurementSet& ms, const MSSelection& selection)
 {
 	if(_isGriddingFinished)
@@ -129,9 +108,9 @@ void ImageWeights::Grid(casacore::MeasurementSet& ms, const MSSelection& selecti
 					{
 						if(!*flagIter)
 						{
-								size_t index = (size_t) x + (size_t) y*_imageWidth;
-								_grid[index] += *weightIter;
-								_totalSum += *weightIter;
+							size_t index = (size_t) x + (size_t) y*_imageWidth;
+							_grid[index] += *weightIter;
+							_totalSum += *weightIter;
 						}
 						++flagIter;
 						++weightIter;
@@ -183,15 +162,7 @@ void ImageWeights::Grid(MSProvider& msProvider, const MSSelection& selection)
 				double
 					u = uInM / curBand.ChannelWavelength(ch),
 					v = vInM / curBand.ChannelWavelength(ch);
-				int x,y;
-				uvToXY(u, v, x, y);
-					
-				if(isWithinLimits(x, y))
-				{
-					size_t index = (size_t) x + (size_t) y*_imageWidth;
-					_grid[index] += *weightIter;
-					_totalSum += *weightIter;
-				}
+				Grid(u, v, *weightIter);
 				++weightIter;
 			}
 			
@@ -256,32 +227,6 @@ void ImageWeights::FinishGridding()
 	}
 }
 
-void ImageWeights::Grid(const std::complex<float> *data, const bool *flags, double uTimesLambda, double vTimesLambda, size_t channelCount, double lowestFrequency, double frequencyStep)
-{
-	if(_isGriddingFinished)
-		throw std::runtime_error("Grid() called after a call to FinishGridding()");
-	for(size_t ch=0;ch!=channelCount;++ch)
-	{
-		if(!flags[ch])
-		{
-			if(vTimesLambda < 0.0)
-			{
-				uTimesLambda = -uTimesLambda;
-				vTimesLambda = -vTimesLambda;
-			}
-			
-			double wavelength = frequencyToWavelength(lowestFrequency + frequencyStep*ch);
-			int x, y;
-			uvToXY(uTimesLambda/wavelength, vTimesLambda/wavelength, x, y);
-			if(isWithinLimits(x, y))
-			{
-				size_t index = (size_t) x + (size_t) y*_imageWidth;
-				_grid[index] += 1.0;
-			}
-		}
-	}
-}
-
 void ImageWeights::SetMinUVRange(double minUVInLambda)
 {
 	ao::uvector<double>::iterator i = _grid.begin();
@@ -320,10 +265,9 @@ void ImageWeights::SetMaxUVRange(double maxUVInLambda)
 	}
 }
 
-void ImageWeights::Save(const string& filename)
+void ImageWeights::GetGrid(double* image) const
 {
-	double* srcPtr = _grid.data();
-	ao::uvector<double> image(_imageWidth*_imageHeight);
+	const double* srcPtr = _grid.data();
 	for(size_t y=0; y!=_imageHeight/2; ++y)
 	{
 		size_t yUpper = _imageHeight/2 - 1 - y;
@@ -337,6 +281,12 @@ void ImageWeights::Save(const string& filename)
 			++srcPtr;
 		}
 	}
+}
+
+void ImageWeights::Save(const string& filename) const
+{
+	ao::uvector<double> image(_imageWidth*_imageHeight);
+	GetGrid(&image[0]);
 	FitsWriter writer;
 	writer.SetImageDimensions(_imageWidth, _imageHeight);
 	writer.Write(filename, image.data());

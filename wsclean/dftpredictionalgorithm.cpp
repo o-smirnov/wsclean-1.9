@@ -6,7 +6,7 @@
 
 #include <casacore/measures/TableMeasures/ArrayMeasColumn.h>
 
-DFTPredictionImage::DFTPredictionImage(size_t width, size_t height, ImageBufferAllocator<double>& allocator) :
+DFTPredictionImage::DFTPredictionImage(size_t width, size_t height, ImageBufferAllocator& allocator) :
 	_width(width),
 	_height(height),
 	_allocator(&allocator)

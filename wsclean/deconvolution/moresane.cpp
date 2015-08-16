@@ -14,7 +14,7 @@ void MoreSane::ExecuteMajorIteration(double* dataImage, double* modelImage, cons
 	if(_iterationNumber!=0)
 	{
 		std::cout << "Convolving model with psf...\n";
-		ImageBufferAllocator<double>::Ptr preparedPsf;
+		ImageBufferAllocator::Ptr preparedPsf;
 		_allocator->Allocate(width*height, preparedPsf);
 		FFTConvolver::PrepareKernel(preparedPsf.data(), psfImage, width, height);
 		FFTConvolver::ConvolveSameSize(modelImage, preparedPsf.data(), width, height);

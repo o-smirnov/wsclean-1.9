@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
 			"-interval <start-index> <end-index>\n"
 			"   Only image the given time interval. Indices specify the timesteps, end index is exclusive.\n"
 			"   Default: image all time steps.\n"
-			"-intervalsout\n"
+			"-intervalsout <count>\n"
 			"   Number of intervals to image inside the selected global interval. Default: 1\n"
 			"-channelrange <start-channel> <end-channel>\n"
 			"   Only image the given channel range. Indices specify channel indices, end index is exclusive.\n"
@@ -166,6 +166,13 @@ int main(int argc, char *argv[])
 			"   This will turn on mfsweighting by default. Default: off.\n"
 			"-multiscale\n"
 			"   Clean on different scales. This is a new experimental algorithm. Default: off.\n"
+			"   This parameter invokes the v1.9 multiscale algorithm, which is slower but more accurate\n"
+			"   compared to the older algorithm, and therefore the recommended one to use.\n"
+			"   The older algorithm is now invoked with -fast-multiscale.\n"
+			"-fast-multiscale\n"
+			"   Clean on different scales. This is a new fast experimental algorithm. Default: off.\n"
+			"   This method used to be invoked with -multiscale before v1.9, but the newer multiscale\n"
+			"   algorithm is somewhat more accurate and therefore recommended.\n"
 			"-multiscale-threshold-bias\n"
 			"   Parameter to lower the threshold for larger scales. The used threshold for a scale\n"
 			"   is threshold(scale)=pointsource_threshold x tbias^scale. A lower bias will clean\n"
@@ -399,6 +406,10 @@ int main(int argc, char *argv[])
 		else if(param == "multiscale")
 		{
 			wsclean.DeconvolutionInfo().SetMultiscale(true);
+		}
+		else if(param == "fast-multiscale")
+		{
+			wsclean.DeconvolutionInfo().SetFastMultiscale(true);
 		}
 		else if(param == "multiscale-threshold-bias")
 		{

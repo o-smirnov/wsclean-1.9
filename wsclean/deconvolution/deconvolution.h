@@ -41,6 +41,7 @@ public:
 	bool StopOnNegativeComponents() const { return _stopOnNegative; }
 	
 	void SetMultiscale(bool multiscale) { _multiscale = multiscale; }
+	void SetFastMultiscale(bool fastMultiscale) { _fastMultiscale = fastMultiscale; }
 	void SetMultiscaleThresholdBias(double thresholdBias)
 	{ _multiscaleThresholdBias = thresholdBias; }
 	void SetMultiscaleScaleBias(double scaleBias)
@@ -50,7 +51,7 @@ public:
 	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
 	void SetMoreSaneArgs(const std::string& arguments) { _moreSaneArgs = arguments; }
 	
-	void InitializeDeconvolutionAlgorithm(const ImagingTable& groupTable, PolarizationEnum psfPolarization, ImageBufferAllocator<double>* imageAllocator, size_t imgWidth, size_t imgHeight, double pixelScaleX, double pixelScaleY, size_t outputChannels, double beamSize, size_t threadCount);
+	void InitializeDeconvolutionAlgorithm(const ImagingTable& groupTable, PolarizationEnum psfPolarization, ImageBufferAllocator* imageAllocator, size_t imgWidth, size_t imgHeight, double pixelScaleX, double pixelScaleY, size_t outputChannels, double beamSize, size_t threadCount);
 	
 	void InitializeImages(class CachedImageSet& residuals, CachedImageSet& models, CachedImageSet& psfs)
 	{
@@ -67,6 +68,7 @@ public:
 	}
 	
 	bool MultiScale() const { return _multiscale; }
+	bool FastMultiScale() const { return _fastMultiscale; }
 	bool UseMoreSane() const { return _useMoreSane; }
 	bool UseIUWT() const { return _useIUWT; }
 	bool IsInitialized() const { return _cleanAlgorithm != 0; }
@@ -84,7 +86,7 @@ private:
 	double _threshold, _gain, _mGain;
 	size_t _nIter;
 	bool _allowNegative, _stopOnNegative;
-	bool _multiscale;
+	bool _multiscale, _fastMultiscale;
 	double _multiscaleThresholdBias, _multiscaleScaleBias;
 	double _cleanBorderRatio;
 	std::string _fitsMask, _casaMask;
@@ -99,7 +101,7 @@ private:
 	std::set<PolarizationEnum> _polarizations;
 	PolarizationEnum _psfPolarization;
 	size_t _imgWidth, _imgHeight;
-	ImageBufferAllocator<double>* _imageAllocator;
+	ImageBufferAllocator* _imageAllocator;
 	CachedImageSet *_psfImages, *_modelImages, *_residualImages;
 };
 

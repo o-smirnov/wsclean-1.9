@@ -11,7 +11,6 @@
 
 class CachedImageSet
 {
-	typedef double value_t;
 public:
 	CachedImageSet() : _allocator(0), _image(0)
 	{
@@ -28,7 +27,7 @@ public:
 		}
 	}
 	
-	void Initialize(const FitsWriter& writer, size_t polCount, size_t freqCount, const std::string& prefix, ImageBufferAllocator<value_t>& allocator)
+	void Initialize(const FitsWriter& writer, size_t polCount, size_t freqCount, const std::string& prefix, ImageBufferAllocator& allocator)
 	{
 		_writer = writer;
 		_polCount = polCount;
@@ -45,7 +44,7 @@ public:
 		_writer = writer;
 	}
 	
-	void Load(value_t* image, PolarizationEnum polarization, size_t freqIndex, bool isImaginary)
+	void Load(double* image, PolarizationEnum polarization, size_t freqIndex, bool isImaginary)
 	{
 		if(_writer.Width() == 0 || _writer.Height() == 0)
 			throw std::runtime_error("Writer is not set.");
@@ -54,14 +53,14 @@ public:
 			if(_image == 0)
 				throw std::runtime_error("Loading image before store");
 			else
-				memcpy(image, _image, _writer.Width() * _writer.Height() * sizeof(value_t));
+				memcpy(image, _image, _writer.Width() * _writer.Height() * sizeof(double));
 		else {
 			FitsReader reader(name(polarization, freqIndex, isImaginary));
 			reader.Read(image);
 		}
 	}
 	
-	void Store(const value_t* image, PolarizationEnum polarization, size_t freqIndex, bool isImaginary)
+	void Store(const double* image, PolarizationEnum polarization, size_t freqIndex, bool isImaginary)
 	{
 		if(_writer.Width() == 0 || _writer.Height() == 0)
 			throw std::runtime_error("Writer is not set.");
@@ -70,7 +69,7 @@ public:
 		{
 			if(_image == 0)
 				_image = _allocator->Allocate(_writer.Width() * _writer.Height());
-			memcpy(_image, image, _writer.Width() * _writer.Height() * sizeof(value_t));
+			memcpy(_image, image, _writer.Width() * _writer.Height() * sizeof(double));
 		}
 		else {
 			std::string n = name(polarization, freqIndex, isImaginary);
@@ -106,8 +105,8 @@ private:
 	size_t _polCount, _freqCount;
 	std::string _prefix;
 	
-	ImageBufferAllocator<value_t>* _allocator;
-	value_t *_image;
+	ImageBufferAllocator* _allocator;
+	double *_image;
 	std::set<std::string> _storedNames;
 };
 

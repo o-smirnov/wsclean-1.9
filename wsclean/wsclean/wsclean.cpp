@@ -845,7 +845,7 @@ void WSClean::runIndependentGroup(const ImagingTable& groupTable)
 				"(beam=" + Angle::ToNiceString(beamMin) + "-" +
 				Angle::ToNiceString(beamMaj) + ", PA=" +
 				Angle::ToNiceString(beamPA) + ")";
-			if(_deconvolution.MultiScale() || _deconvolution.UseMoreSane() || _deconvolution.UseIUWT())
+			if(_deconvolution.MultiScale() || _deconvolution.FastMultiScale() || _deconvolution.UseMoreSane() || _deconvolution.UseIUWT())
 			{
 				std::cout << "Rendering sources to restored image " + beamStr + "... " << std::flush;
 				renderer.Restore(restoredImage, modelImage, _imgWidth, _imgHeight, beamMaj, beamMin, beamPA, Polarization::StokesI);
@@ -886,7 +886,7 @@ void WSClean::runIndependentGroup(const ImagingTable& groupTable)
 void WSClean::writeFirstResidualImages(const ImagingTable& groupTable)
 {
 	std::cout << "Writing first iteration image(s)...\n";
-	ImageBufferAllocator<double>::Ptr ptr;
+	ImageBufferAllocator::Ptr ptr;
 	_imageAllocator.Allocate(_imgWidth*_imgHeight, ptr);
 	for(size_t e=0; e!=groupTable.EntryCount(); ++e)
 	{
@@ -906,7 +906,7 @@ void WSClean::writeFirstResidualImages(const ImagingTable& groupTable)
 void WSClean::writeModelImages(const ImagingTable& groupTable)
 {
 	std::cout << "Writing model image...\n";
-	ImageBufferAllocator<double>::Ptr ptr;
+	ImageBufferAllocator::Ptr ptr;
 	_imageAllocator.Allocate(_imgWidth*_imgHeight, ptr);
 	for(size_t e=0; e!=groupTable.EntryCount(); ++e)
 	{

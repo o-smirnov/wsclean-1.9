@@ -51,9 +51,24 @@ class Model
 		iterator begin() { return _sources.begin(); }
 		iterator end() { return _sources.end(); }
 		
+		const static size_t npos = std::numeric_limits<size_t>::max();
+		
 		void Optimize();
 		
 		void AddSource(const ModelSource& source) { _sources.push_back(source); }
+		
+		/**
+		 * Returns the index of the source with the given name, or npos if not found.
+		 */
+		size_t FindSourceIndex(const std::string& sourceName) const
+		{
+			for(const_iterator i=begin(); i!=end(); ++i)
+			{
+				if(i->Name() == sourceName)
+					return i - begin();
+			}
+			return npos;
+		}
 		
 		void AddCluster(const ModelCluster& cluster) {
 			bool wasAdded = _clusters.insert(std::make_pair(cluster.Name(), cluster)).second;

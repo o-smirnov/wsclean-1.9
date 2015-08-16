@@ -160,7 +160,7 @@ private:
 class DFTPredictionImage
 {
 public:
-	DFTPredictionImage(size_t width, size_t height, ImageBufferAllocator<double>& allocator);
+	DFTPredictionImage(size_t width, size_t height, ImageBufferAllocator& allocator);
 	
 	void Add(PolarizationEnum polarization, const double* image);
 	void Add(PolarizationEnum polarization, const double* real, const double* imaginary);
@@ -168,8 +168,8 @@ public:
 	void FindComponents(DFTPredictionInput& destination, double phaseCentreRA, double phaseCentreDec, double pixelSizeX, double pixelSizeY, double dl, double dm, size_t channelCount);
 private:
 	size_t _width, _height;
-	ImageBufferAllocator<double>* _allocator;
-	ImageBufferAllocator<double>::Ptr _images[4];
+	ImageBufferAllocator* _allocator;
+	ImageBufferAllocator::Ptr _images[4];
 	std::vector<PolarizationEnum> _pols;
 };
 

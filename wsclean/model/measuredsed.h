@@ -442,7 +442,7 @@ public:
 	}
 	
 	
-	void FitLogPolynomial(std::vector<double>& terms, size_t nTerms, PolarizationEnum polarization) const
+	void FitLogPolynomial(std::vector<double>& terms, size_t nTerms, PolarizationEnum polarization, double referenceFrequencyHz = 1.0) const
 	{
 		NonLinearPowerLawFitter fitter;
 		size_t n = 0;
@@ -451,7 +451,7 @@ public:
 			const Measurement &m = i->second;
 			long double flux = m.FluxDensity(polarization);
 			if(std::isfinite(m.FrequencyHz()) && std::isfinite(flux)) {
-				fitter.AddDataPoint(m.FrequencyHz(), flux);
+				fitter.AddDataPoint(m.FrequencyHz() / ReferenceFrequencyHz(), flux);
 				++n;
 			}
 		}

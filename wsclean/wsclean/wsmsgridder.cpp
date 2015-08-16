@@ -30,7 +30,7 @@ WSMSGridder::MSData::MSData() : matchingRows(0), totalRowsProcessed(0)
 WSMSGridder::MSData::~MSData()
 { }
 
-WSMSGridder::WSMSGridder(ImageBufferAllocator<double>* imageAllocator, size_t threadCount, double memFraction, double absMemLimit) : InversionAlgorithm(), _phaseCentreRA(0.0), _phaseCentreDec(0.0), _phaseCentreDL(0.0), _phaseCentreDM(0.0), _denormalPhaseCentre(false), _hasFrequencies(false), _freqHigh(0.0), _freqLow(0.0), _bandStart(0.0), _bandEnd(0.0), _beamSize(0.0), _totalWeight(0.0), _startTime(0.0), _gridMode(WStackingGridder::NearestNeighbour), _cpuCount(threadCount), _laneBufferSize(_cpuCount*2), _imageBufferAllocator(imageAllocator)
+WSMSGridder::WSMSGridder(ImageBufferAllocator* imageAllocator, size_t threadCount, double memFraction, double absMemLimit) : InversionAlgorithm(), _phaseCentreRA(0.0), _phaseCentreDec(0.0), _phaseCentreDL(0.0), _phaseCentreDM(0.0), _denormalPhaseCentre(false), _hasFrequencies(false), _freqHigh(0.0), _freqLow(0.0), _bandStart(0.0), _bandEnd(0.0), _beamSize(0.0), _totalWeight(0.0), _startTime(0.0), _gridMode(WStackingGridder::NearestNeighbour), _cpuCount(threadCount), _laneBufferSize(_cpuCount*2), _imageBufferAllocator(imageAllocator)
 {
 	long int pageCount = sysconf(_SC_PHYS_PAGES), pageSize = sysconf(_SC_PAGE_SIZE);
 	_memSize = (int64_t) pageCount * (int64_t) pageSize;

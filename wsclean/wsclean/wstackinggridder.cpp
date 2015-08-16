@@ -8,7 +8,7 @@
 
 #include <boost/thread/thread.hpp>
 
-WStackingGridder::WStackingGridder(size_t width, size_t height, double pixelSizeX, double pixelSizeY, size_t fftThreadCount, ImageBufferAllocator<double>* allocator, size_t kernelSize, size_t overSamplingFactor) :
+WStackingGridder::WStackingGridder(size_t width, size_t height, double pixelSizeX, double pixelSizeY, size_t fftThreadCount, ImageBufferAllocator* allocator, size_t kernelSize, size_t overSamplingFactor) :
 	_width(width),
 	_height(height),
 	_pixelSizeX(pixelSizeX),
@@ -387,7 +387,7 @@ void WStackingGridder::AddDataSample(std::complex<float> sample, double uInLambd
 	}
 }
 
-void WStackingGridder::SampleDataSample(std::complex<float>& value, double uInLambda, double vInLambda, double wInLambda)
+void WStackingGridder::SampleDataSample(std::complex<double>& value, double uInLambda, double vInLambda, double wInLambda)
 {
 	const size_t
 		layerOffset = layerRangeStart(_curLayerRangeIndex),

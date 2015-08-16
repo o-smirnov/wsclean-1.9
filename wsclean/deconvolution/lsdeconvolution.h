@@ -34,7 +34,7 @@ class LSDeconvolution : public TypedDeconvolutionAlgorithm<deconvolution::Single
 		
 		void nonLinearFit(double* dataImage, double* modelImage, const double* psfImage, size_t width, size_t height, bool& reachedMajorThreshold);
 		
-		ImageBufferAllocator<double>* _allocator;
+		ImageBufferAllocator* _allocator;
 		std::unique_ptr<LSDeconvolutionData> _data;
 };
 
