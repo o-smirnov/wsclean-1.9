@@ -12,6 +12,7 @@ else
 		mkdir /tmp/wsclean/lofar
 		mkdir /tmp/wsclean/model
 		mkdir /tmp/wsclean/msproviders
+		mkdir /tmp/wsclean/multiscale
 		mkdir /tmp/wsclean/wsclean
 		mkdir /tmp/wsclean/wsclean/examples
 		cd ..
@@ -23,6 +24,7 @@ else
 		cp -v lofar/*.{h,cpp} /tmp/wsclean/lofar/
 		cp -v model/*.{h,cpp} /tmp/wsclean/model/
 		cp -v msproviders/*.{h,cpp} /tmp/wsclean/msproviders
+		cp -v multiscale/*.{h,cpp} /tmp/wsclean/multiscale
 		cp -v wsclean/*.{h,cpp} /tmp/wsclean/wsclean
 		cp -v wsclean/examples/{Makefile,*.cpp} /tmp/wsclean/wsclean/examples/
 		cd /tmp

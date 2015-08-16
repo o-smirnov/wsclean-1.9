@@ -92,7 +92,15 @@ IF("${isSystemDir}" STREQUAL "-1")
    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ENDIF("${isSystemDir}" STREQUAL "-1")
 
-add_library(wsclean-lib casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fftwmultithreadenabler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp deconvolution/deconvolution.cpp deconvolution/deconvolutionalgorithm.cpp deconvolution/joinedclean.cpp deconvolution/moresane.cpp deconvolution/multiscaleclean.cpp deconvolution/simpleclean.cpp interface/wscleaninterface.cpp iuwt/imageanalysis.cpp iuwt/iuwtdecomposition.cpp iuwt/iuwtdeconvolutionalgorithm.cpp iuwt/iuwtmask.cpp model/model.cpp msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp wsclean/imagingtable.cpp wsclean/wsclean.cpp wsclean/wsmsgridder.cpp wsclean/wstackinggridder.cpp ${LBEAM_FILES})
+add_library(wsclean-lib
+  casamaskreader.cpp dftpredictionalgorithm.cpp fftconvolver.cpp fftresampler.cpp fftwmultithreadenabler.cpp fitsiochecker.cpp fitsreader.cpp fitswriter.cpp imageweights.cpp nlplfitter.cpp modelrenderer.cpp progressbar.cpp stopwatch.cpp
+  deconvolution/deconvolution.cpp deconvolution/deconvolutionalgorithm.cpp deconvolution/fastmultiscaleclean.cpp deconvolution/joinedclean.cpp deconvolution/moresane.cpp deconvolution/simpleclean.cpp
+  interface/wscleaninterface.cpp
+  iuwt/imageanalysis.cpp iuwt/iuwtdecomposition.cpp iuwt/iuwtdeconvolutionalgorithm.cpp iuwt/iuwtmask.cpp
+  model/model.cpp
+  msproviders/contiguousms.cpp msproviders/msprovider.cpp msproviders/partitionedms.cpp
+  multiscale/multiscalealgorithm.cpp multiscale/multiscaletransforms.cpp multiscale/threadeddeconvolutiontools.cpp
+  wsclean/imagingtable.cpp wsclean/wsclean.cpp wsclean/wsmsgridder.cpp wsclean/wstackinggridder.cpp ${LBEAM_FILES})
 set_target_properties(wsclean-lib PROPERTIES OUTPUT_NAME wsclean)
 
 add_executable(wsclean wscleanmain.cpp)
