@@ -58,7 +58,7 @@ public:
 		std::lock_guard<std::mutex> guard(_mutex);
 		size_t usedCount = 0;
 		std::ostringstream str;
-		for(typename std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
+		for(std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 		{
 			if(i->isFirstHalfUsed) {
 				++usedCount;
@@ -81,7 +81,7 @@ public:
 	{
 		std::lock_guard<std::mutex> guard(_mutex);
 		double totalSize = 0.0;
-		for(typename std::vector<Buffer>::const_iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
+		for(std::vector<Buffer>::const_iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 		{
 			totalSize += double(i->size) * double(sizeof(double)*2);
 		}
@@ -108,7 +108,7 @@ public:
 		
 		++_nReal;
 		if(_nReal > _nRealMax) _nRealMax = _nReal;
-		for(typename std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
+		for(std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 		{
 			if(i->size == size)
 			{
@@ -141,7 +141,7 @@ public:
 		
 		++_nComplex;
 		if(_nComplex > _nComplexMax) _nComplexMax = _nComplex;
-		for(typename std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
+		for(std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 		{
 			if(i->size == size)
 			{
@@ -165,7 +165,7 @@ public:
 		{
 			std::lock_guard<std::mutex> guard(_mutex);
 			bool found = false;
-			for(typename std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
+			for(std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 			{
 				if(i->ptr == buffer)
 				{
@@ -192,7 +192,7 @@ public:
 		{
 			std::lock_guard<std::mutex> guard(_mutex);
 			bool found = false;
-			for(typename std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
+			for(std::vector<Buffer>::iterator i=_buffers.begin(); i!=_buffers.end(); ++i)
 			{
 				if(i->ptr == reinterpret_cast<double*>(buffer))
 				{
@@ -211,7 +211,7 @@ public:
 	void FreeUnused()
 	{
 		size_t unusedCount = 0;
-		typename std::vector<Buffer>::iterator i=_buffers.begin();
+		std::vector<Buffer>::iterator i=_buffers.begin();
 		while(i!=_buffers.end())
 		{
 			if(!i->isFirstHalfUsed && !i->isSecondHalfUsed)
