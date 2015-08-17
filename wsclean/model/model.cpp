@@ -9,6 +9,8 @@
 #include <fstream>
 #include <stdexcept>
 
+size_t Model::npos = std::numeric_limits<size_t>::max();
+
 void Model::read(const char* filename)
 {
 	ModelParser parser;

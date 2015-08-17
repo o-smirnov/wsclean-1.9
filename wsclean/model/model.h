@@ -51,7 +51,7 @@ class Model
 		iterator begin() { return _sources.begin(); }
 		iterator end() { return _sources.end(); }
 		
-		const static size_t npos = std::numeric_limits<size_t>::max();
+		static size_t npos;
 		
 		void Optimize();
 		

@@ -62,6 +62,7 @@ public:
 				if(_masks[m][i]) return m;
 			}
 		}
+		return 0; // avoid compiler warning
 	}
 	
 	void TransferScaleUpwards(size_t fromScale)

@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <iostream>
 
+#include <boost/numeric/conversion/bounds.hpp>
+
 IUWTDeconvolutionAlgorithm::IUWTDeconvolutionAlgorithm(size_t width, size_t height, double gain, double mGain, double cleanBorder, bool allowNegativeComponents, double thresholdLevel, double tolerance) :
 	_width(width), _height(height),
 	_gain(gain), _mGain(mGain), _cleanBorder(cleanBorder), _thresholdLevel(thresholdLevel),
@@ -96,7 +98,7 @@ double IUWTDeconvolutionAlgorithm::getMaxAbs(double cleanBorder, const ao::uvect
 	x = width;
 	y = height;
 	
-	double maxVal = std::numeric_limits<double>::lowest();
+	double maxVal = boost::numeric::bounds<double>::lowest();
 	for(size_t yi=minY; yi!=maxY; ++yi) {
 		const double* dataPtr = data.data() + yi*width;
 		for(size_t xi=minX; xi!=maxX; ++xi) {

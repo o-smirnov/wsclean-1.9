@@ -18,11 +18,11 @@ public:
 	
 	void Transform(double* image, double* scratch, double scale)
 	{
-		Transform({image}, scratch, scale);
+		ao::uvector<double*> images(1, image);
+		Transform(images, scratch, scale);
 	}
 	
-	void Transform(std::initializer_list<double*> images, double* scratch, double scale);
-	void Transform(ao::uvector<double*> images, double* scratch, double scale);
+	void Transform(const ao::uvector<double*>& images, double* scratch, double scale);
 	
 	size_t Width() const { return _width; }
 	size_t Height() const { return _height; }
@@ -38,8 +38,8 @@ public:
 		makeShapeFunction(scaleInPixels, kernel, n);
 		
 		double value = 0.0;
-		for(double& x : kernel)
-			value += x;
+		for(ao::uvector<double>::const_iterator x=kernel.begin(); x!=kernel.end(); ++x)
+			value += *x;
 		
 		return value;
 	}

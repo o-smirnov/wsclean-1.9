@@ -945,9 +945,11 @@ void WSClean::predictGroup(const ImagingTable& imagingGroup)
 			if(reader.ImageWidth()!=_imgWidth || reader.ImageHeight()!=_imgHeight)
 				throw std::runtime_error("Inconsistent image size: input image did not match with specified dimensions.");
 			reader.Read(buffer);
-			for(size_t i=0; i!=_imgWidth*_imgHeight; ++i)
-				if(!std::isfinite(buffer[i]))
+			for(size_t j=0; j!=_imgWidth*_imgHeight; ++j)
+			{
+				if(!std::isfinite(buffer[j]))
 					throw std::runtime_error("The input image contains non-finite values -- can't predict from an image with non-finite values");
+			}
 			_modelImages.Store(buffer, entry.polarization, 0, i==1);
 			_imageAllocator.Free(buffer);
 		}
