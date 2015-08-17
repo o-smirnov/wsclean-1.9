@@ -19,7 +19,7 @@ public:
 	public:
 		friend class ImageBufferAllocator;
 		Ptr()
-			: _data(0) { }
+			: _data(0), _allocator(0) { }
 		Ptr(double* data, ImageBufferAllocator& allocator) 
 			: _data(data), _allocator(&allocator) { }
 		~Ptr()

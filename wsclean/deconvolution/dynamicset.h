@@ -32,22 +32,29 @@ public:
 		AllocateImages();
 	}
 	
+	~DynamicSet()
+	{
+		for(ao::uvector<double*>::iterator img=_images.begin();
+				img!=_images.end(); ++img)
+			_allocator.Free(*img);
+	}
+	
 	void AllocateImages()
 	{
-		for(std::vector<ImageBufferAllocator::Ptr>::iterator img=_images.begin();
+		for(ao::uvector<double*>::iterator img=_images.begin();
 				img!=_images.end(); ++img)
 		{
-			_allocator.Allocate(_imageSize, *img);
+			*img = _allocator.Allocate(_imageSize);
 		}
 	}
 	
 	void AllocateImages(size_t width, size_t height)
 	{
 		_imageSize = width*height;
-		for(std::vector<ImageBufferAllocator::Ptr>::iterator img=_images.begin();
+		for(ao::uvector<double*>::iterator img=_images.begin();
 				img!=_images.end(); ++img)
 		{
-			_allocator.Allocate(_imageSize, *img);
+			*img = _allocator.Allocate(_imageSize);
 		}
 	}
 	
@@ -85,7 +92,7 @@ public:
 						square(scratch);
 					}
 					else {
-						addSquared(scratch, _images[imageIndex].data());
+						addSquared(scratch, _images[imageIndex]);
 					}
 				}
 				squareRoot(scratch);
@@ -117,18 +124,18 @@ public:
 	DynamicSet& operator=(double val)
 	{
 		for(size_t i=0; i!=size(); ++i)
-			assign(_images[i].data(), val);
+			assign(_images[i], val);
 		return *this;
 	}
 	
 	double* operator[](size_t index)
 	{
-		return _images[index].data();
+		return _images[index];
 	}
 	
 	const double* operator[](size_t index) const
 	{
-		return _images[index].data();
+		return _images[index];
 	}
 	
 	size_t size() const { return _images.size(); }
@@ -142,7 +149,7 @@ public:
 		std::unique_ptr<DynamicSet> p(new DynamicSet(&_imagingTable, _allocator, x2-x1, y2-y1));
 		for(size_t i=0; i!=_images.size(); ++i)
 		{
-			copySmallerPart(_images[i].data(), p->_images[i].data(), x1, y1, x2, y2, oldWidth);
+			copySmallerPart(_images[i], p->_images[i], x1, y1, x2, y2, oldWidth);
 		}
 		return p.release();
 	}
@@ -150,21 +157,21 @@ public:
 	DynamicSet& operator*=(double factor)
 	{
 		for(size_t i=0; i!=size(); ++i)
-			multiply(_images[i].data(), factor);
+			multiply(_images[i], factor);
 		return *this;
 	}
 	
 	DynamicSet& operator+=(const DynamicSet& other)
 	{
 		for(size_t i=0; i!=size(); ++i)
-			add(_images[i].data(), other._images[i].data());
+			add(_images[i], other._images[i]);
 		return *this;
 	}
 	
 	void FactorAdd(DynamicSet& rhs, double factor)
 	{
 		for(size_t i=0; i!=size(); ++i)
-			addFactor(_images[i].data(), rhs._images[i].data(), factor);
+			addFactor(_images[i], rhs._images[i], factor);
 	}
 private:
 	void assign(double* lhs, const double* rhs) const
@@ -252,7 +259,7 @@ private:
 		}
 	}
 	
-	std::vector<ImageBufferAllocator::Ptr> _images;
+	ao::uvector<double*> _images;
 	size_t _imageSize;
 	const ImagingTable& _imagingTable;
 	std::map<size_t, size_t> _tableIndexToImageIndex;

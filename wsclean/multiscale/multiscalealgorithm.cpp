@@ -48,7 +48,8 @@ void MultiScaleAlgorithm::PerformMajorIteration(size_t& iterCounter, size_t nIte
 	ImageBufferAllocator::Ptr scratch, integratedScratch;
 	_allocator.Allocate(_width*_height, scratch);
 	_allocator.Allocate(_width*_height, integratedScratch);
-	std::vector<std::vector<ImageBufferAllocator::Ptr>> convolvedPSFs(dirtySet.PSFCount());
+	std::unique_ptr<std::unique_ptr<ImageBufferAllocator::Ptr[]>[]> convolvedPSFs(
+		new std::unique_ptr<ImageBufferAllocator::Ptr[]>[dirtySet.PSFCount()]);
 	dirtySet.GetIntegratedPSF(integratedScratch.data(), psfs);
 	convolvePSFs(convolvedPSFs[0], integratedScratch.data(), scratch.data(), true);
 
@@ -74,7 +75,8 @@ void MultiScaleAlgorithm::PerformMajorIteration(size_t& iterCounter, size_t nIte
 		<< _scaleInfos[scaleWithPeak].maxImageValue * _scaleInfos[scaleWithPeak].factor
 		<< " Jy, major iteration threshold=" << firstThreshold << "\n";
 	
-	std::vector<ImageBufferAllocator::Ptr> doubleConvolvedPSFs(dirtySet.PSFCount());
+	std::unique_ptr<ImageBufferAllocator::Ptr[]> doubleConvolvedPSFs(
+		new ImageBufferAllocator::Ptr[dirtySet.PSFCount()]);
 	for(size_t i=0; i!=dirtySet.PSFCount(); ++i)
 	{
 		_allocator.Allocate(_width*_height, doubleConvolvedPSFs[i]);
@@ -170,10 +172,10 @@ void MultiScaleAlgorithm::initializeScaleInfo()
 	}
 }
 
-void MultiScaleAlgorithm::convolvePSFs(std::vector<ImageBufferAllocator::Ptr>& convolvedPSFs, const double* psf, double* tmp, bool isIntegrated)
+void MultiScaleAlgorithm::convolvePSFs(std::unique_ptr<ImageBufferAllocator::Ptr[]>& convolvedPSFs, const double* psf, double* tmp, bool isIntegrated)
 {
 	MultiScaleTransforms msTransforms(_width, _height);
-	convolvedPSFs = std::vector<ImageBufferAllocator::Ptr>(_scaleInfos.size());
+	convolvedPSFs.reset(new ImageBufferAllocator::Ptr[_scaleInfos.size()]);
 	if(isIntegrated)
 		std::cout << "Scale info:\n";
 	for(size_t scaleIndex=0; scaleIndex!=_scaleInfos.size(); ++scaleIndex)
@@ -322,7 +324,7 @@ void MultiScaleAlgorithm::addComponentToModel(double* model, size_t scaleWithPea
 		MultiScaleTransforms::AddShapeComponent(model, _width, _height, _scaleInfos[scaleWithPeak].scale, _scaleInfos[scaleWithPeak].maxImageValueX, _scaleInfos[scaleWithPeak].maxImageValueY, componentGain);
 }
 
-double* MultiScaleAlgorithm::getConvolvedPSF(size_t psfIndex, size_t scaleIndex, const ao::uvector<const double*>& psfs, double* scratch, const std::vector<std::vector<ImageBufferAllocator::Ptr>>& convolvedPSFs)
+double* MultiScaleAlgorithm::getConvolvedPSF(size_t psfIndex, size_t scaleIndex, const ao::uvector<const double*>& psfs, double* scratch,const std::unique_ptr<std::unique_ptr<ImageBufferAllocator::Ptr[]>[]>& convolvedPSFs)
 {
 	return convolvedPSFs[psfIndex][scaleIndex].data();
 }

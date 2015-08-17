@@ -44,7 +44,7 @@ private:
 	std::vector<MultiScaleAlgorithm::ScaleInfo> _scaleInfos;
 
 	void initializeScaleInfo();
-	void convolvePSFs(std::vector<ImageBufferAllocator::Ptr>& convolvedPSFs, const double* psf, double* tmp, bool isIntegrated);
+	void convolvePSFs(std::unique_ptr<ImageBufferAllocator::Ptr[]>& convolvedPSFs, const double* psf, double* tmp, bool isIntegrated);
 	void findActiveScaleConvolvedMaxima(const DynamicSet& imageSet, double* scratch, double* integratedScratch);
 	void findSingleScaleMaximum(const double* convolvedImage, size_t scaleIndex);
 	void sortScalesOnMaxima(size_t& scaleWithPeak);
@@ -53,7 +53,7 @@ private:
 	void addComponentToModel(double* model, size_t scaleWithPeak, double componentValue);
 	double findPeak(const double *image, size_t &x, size_t &y);
 	
-	double* getConvolvedPSF(size_t psfIndex, size_t scaleIndex, const ao::uvector<const double*>& psfs, double* scratch, const std::vector<std::vector<ImageBufferAllocator::Ptr>>& convolvedPSFs);
+	double* getConvolvedPSF(size_t psfIndex, size_t scaleIndex, const ao::uvector<const double*>& psfs, double* scratch, const std::unique_ptr<std::unique_ptr<ImageBufferAllocator::Ptr[]>[]>& convolvedPSFs);
 	
 };
 

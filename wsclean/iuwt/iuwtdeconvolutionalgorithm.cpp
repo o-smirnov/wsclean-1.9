@@ -419,18 +419,19 @@ bool IUWTDeconvolutionAlgorithm::runConjugateGradient(IUWTDecomposition& iuwt, c
 	return true;
 }
 
+struct PointSource
+{
+	double x, y, flux;
+	bool operator<(const PointSource& rhs) const
+	{ return flux < rhs.flux; }
+};
+
 bool IUWTDeconvolutionAlgorithm::extractPointSources(const IUWTDecomposition& iuwt, const IUWTMask& mask, const double* dirty, double* model)
 {
 	size_t width = iuwt.Width(), height = iuwt.Height();
 	IUWTMask markedMask(mask);
 	bool pointSourcesWereFound = false;
 	GaussianFitter posFitter;
-	struct PointSource
-	{
-		double x, y, flux;
-		bool operator<(const PointSource& rhs) const
-		{ return flux < rhs.flux; }
-	};
 	std::set<PointSource> sources;
 	for(size_t y=0; y!=height; ++y)
 	{

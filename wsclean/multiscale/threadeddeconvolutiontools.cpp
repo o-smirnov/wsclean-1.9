@@ -113,8 +113,10 @@ void ThreadedDeconvolutionTools::MultiScaleTransform(MultiScaleTransforms* msTra
 	size_t imageIndex = 0;
 	size_t nextThread = 0;
 	
-	std::vector<ImageBufferAllocator::Ptr> scratchImages(std::min(images.size(), _threadCount));
-	for(size_t i=0; i!=scratchImages.size(); ++i)
+	size_t scratchCount = std::min(images.size(), _threadCount);
+	std::unique_ptr<ImageBufferAllocator::Ptr[]> scratchImages(
+		new ImageBufferAllocator::Ptr[scratchCount]);
+	for(size_t i=0; i!=scratchCount; ++i)
 		allocator->Allocate(msTransforms->Width() * msTransforms->Height(), scratchImages[i]);
 	
 	while(imageIndex < images.size())
@@ -162,9 +164,12 @@ void ThreadedDeconvolutionTools::FindMultiScalePeak(MultiScaleTransforms* msTran
 	results.resize(scales.size());
 	const size_t dataSize = msTransforms->Width() * msTransforms->Height();
 	
-	std::vector<ImageBufferAllocator::Ptr> imageData(std::min(scales.size(), _threadCount));
-	std::vector<ImageBufferAllocator::Ptr> scratchData(imageData.size());
-	for(size_t i=0; i!=imageData.size(); ++i)
+	size_t size = std::min(scales.size(), _threadCount);
+	std::unique_ptr<ImageBufferAllocator::Ptr[]> imageData(
+		new ImageBufferAllocator::Ptr[size]);
+	std::unique_ptr<ImageBufferAllocator::Ptr[]> scratchData(
+		new ImageBufferAllocator::Ptr[size]);
+	for(size_t i=0; i!=size; ++i)
 	{
 		allocator->Allocate(dataSize, imageData[i]);
 		allocator->Allocate(dataSize, scratchData[i]);

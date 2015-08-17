@@ -253,6 +253,15 @@ string PartitionedMS::getMetaFilename(const string& msPathStr, const std::string
 	return prefix + "-parted-meta.tmp";
 }
 
+// should be private but is not allowed on older compilers
+struct PartitionFiles
+{
+	std::ofstream
+		*data,
+		*weight;
+};
+
+
 /*
  * When partitioned:
  * One global file stores:
@@ -276,13 +285,6 @@ PartitionedMS::Handle PartitionedMS::Partition(const string& msPath, const std::
 		bands.insert(channels[i].band);
 	casacore::MeasurementSet ms(msPath);
 
-	struct PartitionFiles
-	{
-		std::ofstream
-			*data,
-			*weight;
-	};
-	
 	// Ordered as files[pol x channelpart][band]
 	std::vector<std::map<size_t, PartitionFiles>>
 		files(channelParts*polsOut.size());
