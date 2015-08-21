@@ -50,6 +50,8 @@ public:
 	void SetUseIUWT(bool useIUWT) { _useIUWT = useIUWT; }
 	void SetMoreSaneLocation(const std::string& location) { _moreSaneLocation = location; }
 	void SetMoreSaneArgs(const std::string& arguments) { _moreSaneArgs = arguments; }
+	void SetMoreSaneSigmaLevels(const std::vector<std::string> &slevels) { _moreSaneSigmaLevels = slevels; }
+        void SetPrefixName(const std::string& prefixName) { _prefixName = prefixName; }
 	
 	void InitializeDeconvolutionAlgorithm(const ImagingTable& groupTable, PolarizationEnum psfPolarization, ImageBufferAllocator* imageAllocator, size_t imgWidth, size_t imgHeight, double pixelScaleX, double pixelScaleY, size_t outputChannels, double beamSize, size_t threadCount);
 	
@@ -92,6 +94,8 @@ private:
 	std::string _fitsMask, _casaMask;
 	bool _useMoreSane, _useIUWT;
 	std::string _moreSaneLocation, _moreSaneArgs;
+	std::vector<std::string> _moreSaneSigmaLevels;
+	std::string _prefixName;
 	
 	std::unique_ptr<class DeconvolutionAlgorithm> _cleanAlgorithm;
 	

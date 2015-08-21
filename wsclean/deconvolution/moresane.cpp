@@ -22,29 +22,35 @@ void MoreSane::ExecuteMajorIteration(double* dataImage, double* modelImage, cons
 		for(size_t i=0; i!=width*height; ++i)
 			dataImage[i] += modelImage[i];
 	}
+	std::ostringstream outputStr;
+	outputStr << _prefixName << "-tmp-moresaneoutput" << _iterationNumber;
+	const std::string
+		dirtyName(_prefixName + "-tmp-moresaneinput-dirty.fits"),
+		psfName(_prefixName + "-tmp-moresaneinput-psf.fits"),
+		maskName(_prefixName + "-tmp-moresaneinput-mask.fits"),
+		outputName(outputStr.str());
 	FitsWriter writer;
 	writer.SetImageDimensions(width, height);
 	if(this->_cleanMask != 0)
-		writer.WriteMask("tmp-moresaneinput-mask.fits", _cleanMask);
-	std::ostringstream outputStr;
-	outputStr << "tmp-moresaneoutput" << _iterationNumber;
-	const std::string
-		dirtyName("tmp-moresaneinput-dirty.fits"),
-		psfName("tmp-moresaneinput-psf.fits"),
-		outputName(outputStr.str());
+		writer.WriteMask(maskName, _cleanMask);
 	writer.Write(dirtyName, dataImage);
 	writer.Write(psfName, psfImage);
 	
 	std::ostringstream commandLine;
 	commandLine
-		<< "python \"" << _moresaneLocation << "\" ";
+		<< "time python \"" << _moresaneLocation << "\" ";
 	if(!_allowNegativeComponents)
 		commandLine << "-ep ";
 	if(this->_cleanMask != 0)
-		commandLine << "-m tmp-moresaneinput-mask.fits ";
+		commandLine << "-m \"" << maskName + "\" ";
 	if(!_moresaneArguments.empty())
 		commandLine << _moresaneArguments<< ' ';
 	commandLine << "\"" << dirtyName << "\" \"" << psfName << "\" \"" <<  outputName << '\"';
+	
+	if(!_moresaneSigmaLevels.empty()) {
+		commandLine << " -sl " << _moresaneSigmaLevels[std::max(_iterationNumber,_moresaneSigmaLevels.size()-1)] << " ";
+	}
+	
 	std::cout << "Running: " << commandLine.str() << std::endl;
 	int pid = vfork();
 	switch (pid) {
@@ -74,6 +80,12 @@ void MoreSane::ExecuteMajorIteration(double* dataImage, double* modelImage, cons
 	modelReader.Read(modelImage);
 	FitsReader residualReader(outputName+"_residual.fits");
 	residualReader.Read(dataImage);
+	
+	unlink(dirtyName.c_str());
+	unlink(psfName.c_str());
+	unlink(maskName.c_str());
+	unlink((outputName+"_model.fits").c_str());
+	unlink((outputName+"_residual.fits").c_str());
 	
 	++_iterationNumber;
 	

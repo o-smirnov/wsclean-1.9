@@ -30,7 +30,7 @@ public:
 	
 	void FastFit(double& exponent, double& factor);
 	
-	static double Evaluate(double x, const std::vector<double>& terms);
+	static double Evaluate(double x, const std::vector<double>& terms, double referenceFrequencyHz=1.0);
 	
 	static long double Evaluate(long double factor, long double exponent, long double frequencyHz)
 	{

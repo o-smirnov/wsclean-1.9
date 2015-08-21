@@ -17,7 +17,7 @@ MultiScaleAlgorithm::MultiScaleAlgorithm(ImageBufferAllocator& allocator, size_t
 	_scaleBias(scaleBias),
 	_threadCount(threadCount),
 	_cleanMask(0),
-	_verbose(false)
+	_verbose(true)
 {
 }
 
@@ -65,7 +65,7 @@ void MultiScaleAlgorithm::PerformMajorIteration(size_t& iterCounter, size_t nIte
 	MultiScaleTransforms msTransforms(_width, _height);
 	
 	size_t scaleWithPeak;
-	findActiveScaleConvolvedMaxima(dirtySet, scratch.data(), integratedScratch.data());
+	findActiveScaleConvolvedMaxima(dirtySet, integratedScratch.data());
 	sortScalesOnMaxima(scaleWithPeak);
 	
 	double mGainThreshold = std::fabs(_scaleInfos[scaleWithPeak].maxImageValue * _scaleInfos[scaleWithPeak].factor) * (1.0 - _mGain);
@@ -135,7 +135,7 @@ void MultiScaleAlgorithm::PerformMajorIteration(size_t& iterCounter, size_t nIte
 			}
 			
 			// Find maximum for this scale
-			individualConvolvedImages.GetIntegrated(integratedScratch.data(), scratch.data());
+			individualConvolvedImages.GetLinearIntegrated(integratedScratch.data());
 			findSingleScaleMaximum(integratedScratch.data(), scaleWithPeak);
 			
 			++iterCounter;
@@ -143,7 +143,7 @@ void MultiScaleAlgorithm::PerformMajorIteration(size_t& iterCounter, size_t nIte
 		
 		activateScales(scaleWithPeak);
 		
-		findActiveScaleConvolvedMaxima(dirtySet, scratch.data(), integratedScratch.data());
+		findActiveScaleConvolvedMaxima(dirtySet, integratedScratch.data());
 		sortScalesOnMaxima(scaleWithPeak);
 		
 		std::cout << "Iteration " << iterCounter << ", scale " << round(_scaleInfos[scaleWithPeak].scale) << " px : " << _scaleInfos[scaleWithPeak].maxImageValue*_scaleInfos[scaleWithPeak].factor << " Jy at " << _scaleInfos[scaleWithPeak].maxImageValueX << ',' << _scaleInfos[scaleWithPeak].maxImageValueY << '\n';
@@ -215,12 +215,12 @@ void MultiScaleAlgorithm::convolvePSFs(std::unique_ptr<ImageBufferAllocator::Ptr
 	}
 }
 
-void MultiScaleAlgorithm::findActiveScaleConvolvedMaxima(const DynamicSet& imageSet, double* scratch, double* integratedScratch)
+void MultiScaleAlgorithm::findActiveScaleConvolvedMaxima(const DynamicSet& imageSet, double* integratedScratch)
 {
 	MultiScaleTransforms msTransforms(_width, _height);
 	//ImageBufferAllocator::Ptr convolvedImage;
 	//_allocator.Allocate(_width*_height, convolvedImage);
-	imageSet.GetIntegrated(integratedScratch, scratch);
+	imageSet.GetLinearIntegrated(integratedScratch);
 	ao::uvector<double> transformScales;
 	ao::uvector<size_t> transformIndices;
 	for(size_t scaleIndex=0; scaleIndex!=_scaleInfos.size(); ++scaleIndex)

@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
 	size_t sourceX = width/2 - width/17, sourceY = height/2-height/21;
 	image[sourceX + sourceY*width] = 100.0;
 	
-	ImageBufferAllocator<double> allocator;
+	ImageBufferAllocator allocator;
 	
 	// Not strictly required, but the following line will turn on FFTW multi-threading.
 	// In this particular scenario, without w-term correction, this speeds up the

@@ -869,10 +869,8 @@ void IUWTDeconvolutionAlgorithm::PerformMajorIteration(size_t& iterCounter, size
 	_curBoxXStart = 0; _curBoxXEnd = _width;
 	_curBoxYStart = 0; _curBoxYEnd = _height;
 		
-	ao::uvector<double> scratch(_width * _height);
-		
 	ao::uvector<double> dirty(_width * _height);
-	dirtySet.GetIntegrated(dirty.data(), scratch.data());
+	dirtySet.GetLinearIntegrated(dirty.data());
 	ao::uvector<double> psf(psfs[0], psfs[0] + _width*_height);
 	for(size_t i=1; i!=psfs.size(); ++i)
 	{
@@ -892,7 +890,8 @@ void IUWTDeconvolutionAlgorithm::PerformMajorIteration(size_t& iterCounter, size
 	std::cout << "Measuring PSF...\n";
 	{
 		ao::uvector<double> convolvedPSF(psf);
-
+		ao::uvector<double> scratch(_width * _height);
+		
 		FFTConvolver::ConvolveSameSize(convolvedPSF.data(), psfKernel.data(), _width, _height);
 		measureRMSPerScale(psf.data(), convolvedPSF.data(), scratch.data(), maxScale, _psfResponse);
 	}
@@ -913,6 +912,7 @@ void IUWTDeconvolutionAlgorithm::PerformMajorIteration(size_t& iterCounter, size
 		dirtyBeforeIteration = dirty;
 		FFTConvolver::PrepareKernel(psfKernel.data(), psf.data(), _width, _height);
 		std::vector<ValComponent> maxComponents;
+		ao::uvector<double> scratch(_width * _height);
 		bool succeeded = findAndDeconvolveStructure(*iuwt, dirty, psf, psfKernel, scratch, structureModel, curEndScale, curMinScale, _gain, maxComponents);
 		
 		if(succeeded)
@@ -929,7 +929,7 @@ void IUWTDeconvolutionAlgorithm::PerformMajorIteration(size_t& iterCounter, size
 				FFTConvolver::ConvolveSameSize(scratch.data(), psfKernel.data(), _width, _height);
 				Subtract(dirtySet[i], scratch);
 			}
-			dirtySet.GetIntegrated(dirty.data(), scratch.data());
+			dirtySet.GetLinearIntegrated(dirty.data());
 			
 			while(maxComponents.size() > initialComponents.size())
 			{

@@ -179,7 +179,8 @@ void Deconvolution::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_
 		modelSet(_imgWidth*_imgHeight, _summedCount, *_imageAllocator),
 		residualSet(_imgWidth*_imgHeight, _summedCount, *_imageAllocator);
 	
-	ImageBufferAllocator::Ptr* psfImagePtrs = new ImageBufferAllocator::Ptr[_summedCount];
+	std::unique_ptr<ImageBufferAllocator::Ptr[]> psfImagePtrs(
+		new ImageBufferAllocator::Ptr[_summedCount]);
 	std::vector<double*> psfImages(_summedCount);
 	for(size_t ch=0; ch!=_summedCount; ++ch)
 	{
@@ -198,7 +199,6 @@ void Deconvolution::performJoinedPolFreqClean(bool& reachedMajorThreshold, size_
 		modelSet.Store(*_modelImages, _polarizations, ch);
 		residualSet.Store(*_residualImages, _polarizations, ch);
 	}
-	delete[] psfImagePtrs;
 }
 
 void Deconvolution::FreeDeconvolutionAlgorithms()
@@ -230,7 +230,7 @@ void Deconvolution::InitializeDeconvolutionAlgorithm(const ImagingTable& groupTa
 	
 	if(_useMoreSane)
 	{
-		_cleanAlgorithm.reset(new MoreSane(_moreSaneLocation, _moreSaneArgs));
+		_cleanAlgorithm.reset(new MoreSane(_moreSaneLocation, _moreSaneArgs, _moreSaneSigmaLevels, _prefixName));
 	}
 	else if(_useIUWT)
 	{

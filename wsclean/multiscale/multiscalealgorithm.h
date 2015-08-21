@@ -45,7 +45,7 @@ private:
 
 	void initializeScaleInfo();
 	void convolvePSFs(std::unique_ptr<ImageBufferAllocator::Ptr[]>& convolvedPSFs, const double* psf, double* tmp, bool isIntegrated);
-	void findActiveScaleConvolvedMaxima(const DynamicSet& imageSet, double* scratch, double* integratedScratch);
+	void findActiveScaleConvolvedMaxima(const DynamicSet& imageSet, double* integratedScratch);
 	void findSingleScaleMaximum(const double* convolvedImage, size_t scaleIndex);
 	void sortScalesOnMaxima(size_t& scaleWithPeak);
 	void activateScales(size_t scaleWithLastPeak);

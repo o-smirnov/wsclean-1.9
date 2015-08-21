@@ -443,11 +443,11 @@ void NonLinearPowerLawFitter::FastFit(double& exponent, double& factor)
 	}
 }
 
-double NonLinearPowerLawFitter::Evaluate(double x, const std::vector<double>& terms)
+double NonLinearPowerLawFitter::Evaluate(double x, const std::vector<double>& terms, double referenceFrequencyHz)
 {
 	if(terms.empty()) return 0.0;
 	double y = 0.0;
-	const double lg = log10(x);
+	const double lg = log10(x/referenceFrequencyHz);
 	for(size_t k=0; k!=terms.size(); ++k)
 	{
 		size_t j = terms.size()-k-1;

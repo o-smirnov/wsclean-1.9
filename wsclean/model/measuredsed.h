@@ -451,7 +451,7 @@ public:
 			const Measurement &m = i->second;
 			long double flux = m.FluxDensity(polarization);
 			if(std::isfinite(m.FrequencyHz()) && std::isfinite(flux)) {
-				fitter.AddDataPoint(m.FrequencyHz() / ReferenceFrequencyHz(), flux);
+				fitter.AddDataPoint(m.FrequencyHz() / referenceFrequencyHz, flux);
 				++n;
 			}
 		}

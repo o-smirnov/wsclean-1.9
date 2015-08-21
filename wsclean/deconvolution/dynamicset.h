@@ -12,7 +12,7 @@ class DynamicSet
 {
 public:
 	DynamicSet(const ImagingTable* table, ImageBufferAllocator& allocator) :
-		_images(table->EntryCount()),
+		_images(table->EntryCount(), 0),
 		_imageSize(0),
 		_imagingTable(*table),
 		_imageIndexToPSFIndex(table->EntryCount()),
@@ -22,7 +22,7 @@ public:
 	}
 	
 	DynamicSet(const ImagingTable* table, ImageBufferAllocator& allocator, size_t width, size_t height) :
-		_images(table->EntryCount()),
+		_images(table->EntryCount(), 0),
 		_imageSize(width*height),
 		_imagingTable(*table),
 		_imageIndexToPSFIndex(table->EntryCount()),
@@ -68,13 +68,29 @@ public:
 		return _allocator;
 	}
 	
-	void GetIntegrated(double* dest, double* scratch) const
+	/**
+	 * This function will calculate the integration over all images, squaring
+	 * images that are in the same square-imageg group. For example, with
+	 * a squared group of [I, Q, ..] and another group [I2, Q2, ...], this
+	 * will calculate:
+	 * 
+	 * sqrt(I^2 + Q^2 + ..) + sqrt(I2^2 + Q2^2 ..) + ..
+	 * ----------------------------------------------
+	 *           1          +           1          + ..
+	 * 
+	 * If the 'squared groups' are of size 1, the average of the groups will be
+	 * returned (i.e., without square-rooting the square).
+	 * 
+	 * This implies that the some will have normal flux values.
+	 * @param dest Pre-allocated output array that will be filled with the
+	 * integrated image.
+	 * @param scratch Pre-allocated scratch space, same size as image.
+	 */
+	void GetSquareIntegrated(double* dest, double* scratch) const
 	{
-		double nImagesAdded = 0.0;
 		for(size_t sqIndex = 0; sqIndex!=_imagingTable.SquaredGroupCount(); ++sqIndex)
 		{
 			ImagingTable subTable = _imagingTable.GetSquaredGroup(sqIndex);
-			nImagesAdded += sqrt(subTable.EntryCount());
 			if(subTable.EntryCount() == 1)
 			{
 				const ImagingTableEntry& entry = subTable[0];
@@ -103,8 +119,38 @@ public:
 			else
 				add(dest, scratch);
 		}
-		if(nImagesAdded > 0.0)
-			multiply(dest, 1.0/nImagesAdded);
+		if(_imagingTable.SquaredGroupCount() > 0.0)
+			multiply(dest, 1.0/_imagingTable.SquaredGroupCount());
+		else
+			assign(dest, 0.0);
+	}
+	
+	/**
+	 * This function will calculate the 'linear' integration over all images.
+	 * This will return the average of all images. Normally, @ref GetSquareIntegrated
+	 * should be used for peak finding, but in case negative values should remain
+	 * negative, such as with multiscale (otherwise a sidelobe will be fitted with
+	 * large scales), this function can be used.
+	 * @param dest Pre-allocated output array that will be filled with the average
+	 * values.
+	 */
+	void GetLinearIntegrated(double* dest) const
+	{
+		for(size_t sqIndex = 0; sqIndex!=_imagingTable.SquaredGroupCount(); ++sqIndex)
+		{
+			ImagingTable subTable = _imagingTable.GetSquaredGroup(sqIndex);
+			for(size_t eIndex = 0; eIndex!=subTable.EntryCount(); ++eIndex)
+			{
+				const ImagingTableEntry& entry = subTable[eIndex];
+				size_t imageIndex = _tableIndexToImageIndex.find(entry.index)->second;
+				if(eIndex == 0)
+					assign(dest, _images[imageIndex]);
+				else
+					add(dest, _images[imageIndex]);
+			}
+		}
+		if(_imagingTable.SquaredGroupCount() > 0)
+			multiply(dest, 1.0/double(_imagingTable.SquaredGroupCount()));
 		else
 			assign(dest, 0.0);
 	}
