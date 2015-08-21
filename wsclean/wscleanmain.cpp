@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
 			wsclean.DeconvolutionInfo().SetUseIUWT(true);
 			// Currently (WSClean 1.9, 2015-08-19) IUWT deconvolution
 			// seems not to work when allowing negative components. The algorithm
-			// becomes unstable. Hence, 
+			// becomes unstable. Hence, turn negative components off.
 			wsclean.DeconvolutionInfo().SetAllowNegativeComponents(false);
 		}
 		else if(param == "moresane-ext")

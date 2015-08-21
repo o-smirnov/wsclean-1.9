@@ -17,7 +17,7 @@ MultiScaleAlgorithm::MultiScaleAlgorithm(ImageBufferAllocator& allocator, size_t
 	_scaleBias(scaleBias),
 	_threadCount(threadCount),
 	_cleanMask(0),
-	_verbose(true)
+	_verbose(false)
 {
 }
 
